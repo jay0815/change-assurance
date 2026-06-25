@@ -1,0 +1,24 @@
+CLAUDE.md
+  77ac022c9952fb58 206-208
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "24b4af78b194cc0b658f3b4285181eafed4510a1",
+  "prompts": {
+    "77ac022c9952fb58": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7dd5359e-98af-49f8-beae-ec8156c9a9ea",
+        "model": "mimo-v2.5-pro"
+      },
+      "human_author": "guanchengqian",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 3,
+      "accepted_lines": 3,
+      "overriden_lines": 0,
+      "messages_url": "http://10.1.138.136:9188/cas/17df10a9fe367eb08f89d73f1b5119e46dddb489a81aed98458e7ebf008ae3b2"
+    }
+  }
+}
