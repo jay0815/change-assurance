@@ -5,6 +5,7 @@ import { mkdtempSync, readFileSync, existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
+import { stringify } from "yaml";
 
 vi.mock("@change-assurance/core", async () => {
   const actual = await vi.importActual("@change-assurance/core");
@@ -114,9 +115,9 @@ describe("reviewPrepare", () => {
 
       expect(manifest.diffHash).toBe(sha256("diff content"));
       expect(manifest.changedFilesHash).toBe(
-        sha256(JSON.stringify([{ path: "src/file.ts", status: "modified", additions: 10, deletions: 5 }])),
+        sha256(JSON.stringify([{ path: "src/file.ts", status: "modified", additions: 10, deletions: 5 }], null, 2)),
       );
-      expect(manifest.policySnapshotHash).toBe(sha256(JSON.stringify({}, null, 2)));
+      expect(manifest.policySnapshotHash).toBe(sha256(stringify({})));
       expect(manifest.gitStateHash).toBe(
         sha256(JSON.stringify({
           baseRef: "main",
@@ -126,7 +127,7 @@ describe("reviewPrepare", () => {
           branch: "main",
           isDirty: false,
           timestamp: "2024-01-01T00:00:00.000Z",
-        })),
+        }, null, 2)),
       );
     });
   });

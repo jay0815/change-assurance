@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
+import { stringify } from "yaml";
 import {
   generateRunId,
   getInputDir,
@@ -52,10 +53,12 @@ export function reviewPrepare(options: PrepareOptions): {
   mkdirSync(inputDir, { recursive: true });
 
   const policy = loadPolicy(cwd);
-  const policySnapshot = JSON.stringify(policy, null, 2);
+  const policySnapshot = stringify(policy);
   const diff = getDiff(options.base, options.head);
   const changedFiles = getChangedFiles(options.base, options.head);
+  const changedFilesJson = JSON.stringify(changedFiles, null, 2);
   const gitState = collectGitState(options.base, options.head);
+  const gitStateJson = JSON.stringify(gitState, null, 2);
 
   const inputManifest = {
     runId,
@@ -64,8 +67,8 @@ export function reviewPrepare(options: PrepareOptions): {
     createdAt: new Date().toISOString(),
     policySnapshotHash: sha256(policySnapshot),
     diffHash: sha256(diff),
-    changedFilesHash: sha256(JSON.stringify(changedFiles)),
-    gitStateHash: sha256(JSON.stringify(gitState)),
+    changedFilesHash: sha256(changedFilesJson),
+    gitStateHash: sha256(gitStateJson),
   };
 
   writeFileSync(
@@ -73,18 +76,9 @@ export function reviewPrepare(options: PrepareOptions): {
     JSON.stringify(inputManifest, null, 2),
   );
   writeFileSync(resolve(inputDir, INPUT_ARTIFACTS.DIFF_PATCH), diff);
-  writeFileSync(
-    resolve(inputDir, INPUT_ARTIFACTS.CHANGED_FILES),
-    JSON.stringify(changedFiles, null, 2),
-  );
-  writeFileSync(
-    resolve(inputDir, INPUT_ARTIFACTS.GIT_STATE),
-    JSON.stringify(gitState, null, 2),
-  );
-  writeFileSync(
-    resolve(inputDir, INPUT_ARTIFACTS.POLICY_SNAPSHOT),
-    policySnapshot,
-  );
+  writeFileSync(resolve(inputDir, INPUT_ARTIFACTS.CHANGED_FILES), changedFilesJson);
+  writeFileSync(resolve(inputDir, INPUT_ARTIFACTS.GIT_STATE), gitStateJson);
+  writeFileSync(resolve(inputDir, INPUT_ARTIFACTS.POLICY_SNAPSHOT), policySnapshot);
 
   return { runId, inputDir };
 }
