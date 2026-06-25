@@ -1,0 +1,66 @@
+CLAUDE.md
+  77ac022c9952fb58 1-69
+tsconfig.base.json
+  77ac022c9952fb58 1-17
+packages/core/tsconfig.json
+  77ac022c9952fb58 1-8
+packages/core/src/types.ts
+  77ac022c9952fb58 1-36
+packages/cli/src/policy.ts
+  77ac022c9952fb58 1-28
+packages/core/src/git.ts
+  77ac022c9952fb58 1-83
+packages/core/package.json
+  77ac022c9952fb58 1-17
+packages/skills/README.md
+  77ac022c9952fb58 1-15
+packages/cli/src/index.ts
+  77ac022c9952fb58 1-60
+packages/core/src/index.ts
+  77ac022c9952fb58 1-3
+change-assurance.yaml
+  77ac022c9952fb58 1-17
+packages/cli/tsconfig.json
+  77ac022c9952fb58 1-8
+package.json
+  77ac022c9952fb58 1-17
+packages/adapter-claude/package.json
+  77ac022c9952fb58 1-20
+packages/adapter-claude/README.md
+  77ac022c9952fb58 1-15
+packages/cli/src/review-prepare.ts
+  77ac022c9952fb58 1-86
+packages/cli/package.json
+  77ac022c9952fb58 1-16
+packages/adapter-claude/tsconfig.json
+  77ac022c9952fb58 1-8
+pnpm-workspace.yaml
+  77ac022c9952fb58 1-2
+packages/core/src/artifact.ts
+  77ac022c9952fb58 1-27
+packages/skills/package.json
+  77ac022c9952fb58 1-9
+packages/adapter-claude/src/index.ts
+  77ac022c9952fb58 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "4d20519c054765c2d0fb27cee5fc33a33c046ec2",
+  "prompts": {
+    "77ac022c9952fb58": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7dd5359e-98af-49f8-beae-ec8156c9a9ea",
+        "model": "mimo-v2.5-pro"
+      },
+      "human_author": "guanchengqian",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 562,
+      "overriden_lines": 0,
+      "messages_url": "http://10.1.138.136:9188/cas/d8373669aaaae0c514d98fdac64125f0fcd11b24ed28aef5fb152f09e4d4bac5"
+    }
+  }
+}
