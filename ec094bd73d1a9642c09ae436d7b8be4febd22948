@@ -1,0 +1,26 @@
+packages/cli/src/__tests__/review-verify.test.ts
+  77ac022c9952fb58 1-209
+packages/cli/src/review-verify.ts
+  77ac022c9952fb58 1,5,59,107-110,112-113,116-117,126,129-130,133-134,138,143,150,174,183,200
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "ec094bd73d1a9642c09ae436d7b8be4febd22948",
+  "prompts": {
+    "77ac022c9952fb58": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7dd5359e-98af-49f8-beae-ec8156c9a9ea",
+        "model": "mimo-v2.5-pro"
+      },
+      "human_author": "guanchengqian",
+      "messages": [],
+      "total_additions": 731,
+      "total_deletions": 554,
+      "accepted_lines": 462,
+      "overriden_lines": 0,
+      "messages_url": "http://10.1.138.136:9188/cas/a30da2888710a8ef8433a0d9590855f0f33414a51596db03efe05927fd945bca"
+    }
+  }
+}
