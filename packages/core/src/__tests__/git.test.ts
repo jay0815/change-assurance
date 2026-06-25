@@ -29,6 +29,7 @@ describe("git", () => {
     it("should return true when in a git repository", () => {
       mockExecSync.mockReturnValue("true");
       expect(isGitRepository()).toBe(true);
+      expect(mockExecSync).toHaveBeenCalledWith("git", ["rev-parse", "--is-inside-work-tree"], expect.any(Object));
     });
 
     it("should return false when not in a git repository", () => {
@@ -43,6 +44,7 @@ describe("git", () => {
     it("should return true when ref exists", () => {
       mockExecSync.mockReturnValue("abc123");
       expect(refExists("main")).toBe(true);
+      expect(mockExecSync).toHaveBeenCalledWith("git", ["rev-parse", "--verify", "main"], expect.any(Object));
     });
 
     it("should return false when ref does not exist", () => {
@@ -84,6 +86,7 @@ describe("git", () => {
       const expectedDiff = "diff --git a/file.ts b/file.ts\n...";
       mockExecSync.mockReturnValue(expectedDiff);
       expect(getDiff("main", "HEAD")).toBe(expectedDiff);
+      expect(mockExecSync).toHaveBeenCalledWith("git", ["diff", "main...HEAD"], expect.any(Object));
     });
   });
 
@@ -110,22 +113,50 @@ describe("git", () => {
       mockExecSync.mockReturnValue("");
       expect(getChangedFiles("main", "HEAD")).toEqual([]);
     });
+
+    it("should handle binary files with '-' additions/deletions", () => {
+      mockExecSync.mockReturnValue("-\t-\tbinary.png");
+      const files = getChangedFiles("main", "HEAD");
+      expect(files).toHaveLength(1);
+      expect(files[0]).toEqual({
+        path: "binary.png",
+        status: "modified",
+        additions: 0,
+        deletions: 0,
+      });
+    });
+
+    it("should handle trailing newline correctly", () => {
+      mockExecSync.mockReturnValue("10\t5\tsrc/file.ts\n");
+      const files = getChangedFiles("main", "HEAD");
+      expect(files).toHaveLength(1);
+      expect(files[0].path).toBe("src/file.ts");
+    });
+
+    it("should call git with correct arguments", () => {
+      mockExecSync.mockReturnValue("");
+      getChangedFiles("base", "head");
+      expect(mockExecSync).toHaveBeenCalledWith("git", ["diff", "--numstat", "base...head"], expect.any(Object));
+    });
   });
 
   describe("getBaseCommit", () => {
     it("should return base commit hash", () => {
       mockExecSync.mockReturnValue("base123");
       expect(getBaseCommit("main")).toBe("base123");
+      expect(mockExecSync).toHaveBeenCalledWith("git", ["rev-parse", "main"], expect.any(Object));
     });
   });
 
   describe("collectGitState", () => {
     it("should collect complete git state", () => {
-      mockExecSync
-        .mockReturnValueOnce("base-commit-hash") // getBaseCommit
-        .mockReturnValueOnce("head-commit-hash") // getHeadCommit
-        .mockReturnValueOnce("main") // getCurrentBranch
-        .mockReturnValueOnce(""); // isWorkingTreeDirty
+      mockExecSync.mockImplementation((_cmd: string, args: string[]) => {
+        if (args[0] === "rev-parse" && args[1] === "main") return "base-commit-hash";
+        if (args[0] === "rev-parse" && args[1] === "HEAD") return "head-commit-hash";
+        if (args[0] === "rev-parse" && args[1] === "--abbrev-ref" && args[2] === "HEAD") return "main";
+        if (args[0] === "status") return "";
+        return "";
+      });
 
       const state = collectGitState("main", "HEAD");
       expect(state).toEqual({
@@ -137,6 +168,19 @@ describe("git", () => {
         isDirty: false,
         timestamp: expect.any(String),
       });
+    });
+
+    it("should detect dirty working tree", () => {
+      mockExecSync.mockImplementation((_cmd: string, args: string[]) => {
+        if (args[0] === "rev-parse" && args[1] === "main") return "base-hash";
+        if (args[0] === "rev-parse" && args[1] === "HEAD") return "head-hash";
+        if (args[0] === "rev-parse" && args[1] === "--abbrev-ref") return "main";
+        if (args[0] === "status") return " M file.ts";
+        return "";
+      });
+
+      const state = collectGitState("main", "HEAD");
+      expect(state.isDirty).toBe(true);
     });
   });
 
