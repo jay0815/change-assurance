@@ -1,7 +1,8 @@
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { existsSync, readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { parse } from "yaml";
 import {
   getInputDir,
   getVerificationDir,
@@ -50,17 +51,12 @@ function matchesAnyPattern(filePath: string, patterns: string[]): boolean {
 function shouldExecuteCommand(
   command: VerificationCommandPolicy,
   changedFiles: ChangedFile[],
-  ignorePatterns: string[],
 ): { required: boolean; reason: string } {
   if (!command.when?.pathsAny) {
     return { required: true, reason: "no when condition specified" };
   }
 
-  const relevantFiles = changedFiles.filter(
-    (f) => !matchesAnyPattern(f.path, ignorePatterns),
-  );
-
-  const matched = relevantFiles.some((f) =>
+  const matched = changedFiles.some((f) =>
     matchesAnyPattern(f.path, command.when!.pathsAny!),
   );
 
@@ -100,7 +96,6 @@ export function reviewVerify(options: VerifyOptions): VerificationLedger {
   const runId = options.runId;
   const inputDir = resolve(cwd, getInputDir(runId));
 
-  // Check run exists
   if (!existsSync(inputDir)) {
     throw new VerifyError(`Run not found: ${runId}`);
   }
@@ -109,15 +104,17 @@ export function reviewVerify(options: VerifyOptions): VerificationLedger {
   const manifestPath = resolve(inputDir, INPUT_ARTIFACTS.INPUT_MANIFEST);
   const manifest = readJsonFile<InputManifest>(manifestPath);
 
-  const changedFilesPath = resolve(inputDir, INPUT_ARTIFACTS.CHANGED_FILES);
-  const changedFiles = readJsonFile<ChangedFile[]>(changedFilesPath);
-
-  const gitStatePath = resolve(inputDir, INPUT_ARTIFACTS.GIT_STATE);
-  const gitState = readJsonFile<GitState>(gitStatePath);
-
   const policySnapshotPath = resolve(inputDir, INPUT_ARTIFACTS.POLICY_SNAPSHOT);
   const policySnapshotContent = readFileSync(policySnapshotPath, "utf-8");
-  const policy = JSON.parse(policySnapshotContent) as PolicyConfig;
+  const policy = parse(policySnapshotContent) as PolicyConfig;
+
+  const changedFilesPath = resolve(inputDir, INPUT_ARTIFACTS.CHANGED_FILES);
+  const changedFilesContent = readFileSync(changedFilesPath, "utf-8");
+  const changedFiles = JSON.parse(changedFilesContent) as ChangedFile[];
+
+  const gitStatePath = resolve(inputDir, INPUT_ARTIFACTS.GIT_STATE);
+  const gitStateContent = readFileSync(gitStatePath, "utf-8");
+  const gitState = JSON.parse(gitStateContent) as GitState;
 
   const diffPath = resolve(inputDir, INPUT_ARTIFACTS.DIFF_PATCH);
   const diffContent = readFileSync(diffPath, "utf-8");
@@ -125,48 +122,32 @@ export function reviewVerify(options: VerifyOptions): VerificationLedger {
   // Validate preconditions
   const preconditionErrors: string[] = [];
 
-  // Check policy snapshot hash
   if (sha256(policySnapshotContent) !== manifest.policySnapshotHash) {
-    preconditionErrors.push(
-      "policy.snapshot.yaml hash mismatch with input-manifest.json",
-    );
+    preconditionErrors.push("policy.snapshot.yaml hash mismatch with input-manifest.json");
   }
 
-  // Check changed files hash
-  if (sha256(JSON.stringify(changedFiles)) !== manifest.changedFilesHash) {
-    preconditionErrors.push(
-      "changed-files.json hash mismatch with input-manifest.json",
-    );
+  if (sha256(changedFilesContent) !== manifest.changedFilesHash) {
+    preconditionErrors.push("changed-files.json hash mismatch with input-manifest.json");
   }
 
-  // Check git state hash
-  if (sha256(JSON.stringify(gitState)) !== manifest.gitStateHash) {
-    preconditionErrors.push(
-      "git-state.json hash mismatch with input-manifest.json",
-    );
+  if (sha256(gitStateContent) !== manifest.gitStateHash) {
+    preconditionErrors.push("git-state.json hash mismatch with input-manifest.json");
   }
 
-  // Check diff hash
   if (sha256(diffContent) !== manifest.diffHash) {
-    preconditionErrors.push(
-      "diff.patch hash mismatch with input-manifest.json",
-    );
+    preconditionErrors.push("diff.patch hash mismatch with input-manifest.json");
   }
 
-  // Check HEAD matches
   const currentHead = getHeadCommit();
   if (currentHead !== gitState.headCommit) {
-    preconditionErrors.push(
-      `HEAD changed: expected ${gitState.headCommit}, got ${currentHead}`,
-    );
+    preconditionErrors.push(`HEAD changed: expected ${gitState.headCommit}, got ${currentHead}`);
   }
 
-  // Check working tree clean
   if (isWorkingTreeDirty()) {
     preconditionErrors.push("Git working tree is dirty");
   }
 
-  // If preconditions failed, return blocked ledger
+  // Create blocked ledger if preconditions failed
   if (preconditionErrors.length > 0) {
     const ledger: VerificationLedger = {
       runId,
@@ -190,8 +171,7 @@ export function reviewVerify(options: VerifyOptions): VerificationLedger {
     return ledger;
   }
 
-  // Select and execute commands
-  const ignorePatterns = policy.scope?.ignore ?? [];
+  // Execute verification commands
   const commands = policy.verification?.commands ?? [];
   const verificationDir = resolve(cwd, getVerificationDir(runId));
   mkdirSync(verificationDir, { recursive: true });
@@ -200,11 +180,7 @@ export function reviewVerify(options: VerifyOptions): VerificationLedger {
   const commandResults: VerificationCommandResult[] = [];
 
   for (const cmd of commands) {
-    const { required, reason } = shouldExecuteCommand(
-      cmd,
-      changedFiles,
-      ignorePatterns,
-    );
+    const { required, reason } = shouldExecuteCommand(cmd, changedFiles);
 
     if (!required) {
       commandResults.push({
@@ -221,8 +197,7 @@ export function reviewVerify(options: VerifyOptions): VerificationLedger {
     const startedAt = new Date().toISOString();
     const { exitCode, stdout, stderr } = executeCommand(cmd.argv, cwd);
     const endedAt = new Date().toISOString();
-    const durationMs =
-      new Date(endedAt).getTime() - new Date(startedAt).getTime();
+    const durationMs = new Date(endedAt).getTime() - new Date(startedAt).getTime();
 
     // Save logs
     const stdoutPath = getVerificationLogPath(runId, cmd.id, "stdout");
@@ -257,13 +232,6 @@ export function reviewVerify(options: VerifyOptions): VerificationLedger {
     skipped: commandResults.filter((c) => c.status === "skipped").length,
     notRequired: commandResults.filter((c) => c.status === "not_required").length,
   };
-
-  const hasFailures = summary.failed > 0;
-  const runStatus = workspaceChangedAfterVerify
-    ? "invalidated"
-    : hasFailures
-      ? "completed"
-      : "completed";
 
   const ledger: VerificationLedger = {
     runId,
