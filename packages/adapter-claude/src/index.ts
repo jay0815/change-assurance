@@ -1,2 +1,2 @@
-// @change-assurance/adapter-claude
-// TODO: Implement Claude Code adapter
+export { ClaudeAdapter, AdapterError } from "./claude-adapter.js";
+export type { AdapterCapabilities, RunStageInput, RunStageOutput } from "./claude-adapter.js";

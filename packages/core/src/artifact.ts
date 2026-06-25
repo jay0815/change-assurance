@@ -42,3 +42,15 @@ export const VERIFICATION_ARTIFACTS = {
   LEDGER: "verification-ledger.json",
   LOGS_DIR: "logs",
 } as const;
+
+export function getStagesDir(runId: string): string {
+  return `${getRunDir(runId)}/stages`;
+}
+
+export function getStageArtifactPath(runId: string, stage: string): string {
+  return `${getStagesDir(runId)}/${stage}.json`;
+}
+
+export function getStageRawArtifactPath(runId: string, stage: string): string {
+  return `${getStagesDir(runId)}/${stage}.raw.json`;
+}

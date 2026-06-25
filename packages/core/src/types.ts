@@ -93,3 +93,51 @@ export interface VerificationLedger {
   };
   workspaceChangedAfterVerify: boolean;
 }
+
+// Stage types
+export type ReviewStage = "change-map";
+
+export interface ChangedModule {
+  path: string;
+  role: string;
+  changeSummary: string;
+}
+
+export interface BehaviorChange {
+  summary: string;
+  evidenceRefs: string[];
+}
+
+export interface RiskArea {
+  area: string;
+  reason: string;
+  evidenceRefs: string[];
+}
+
+export interface ReviewPriority {
+  priority: "high" | "medium" | "low";
+  area: string;
+  reason: string;
+}
+
+export interface UncoveredContext {
+  area: string;
+  reason: string;
+}
+
+export interface ChangeMap {
+  runId: string;
+  stage: "change-map";
+  createdAt: string;
+  sourceArtifacts: {
+    inputManifestHash: string;
+    policySnapshotHash: string;
+    verificationLedgerHash?: string;
+  };
+  changedModules: ChangedModule[];
+  behaviorChanges: BehaviorChange[];
+  riskAreas: RiskArea[];
+  reviewPriorities: ReviewPriority[];
+  uncoveredContext: UncoveredContext[];
+  assumptions: string[];
+}

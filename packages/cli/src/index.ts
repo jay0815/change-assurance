@@ -2,6 +2,8 @@
 
 import { reviewPrepare, PrepareError } from "./review-prepare.js";
 import { reviewVerify, VerifyError } from "./review-verify.js";
+import { reviewStage, StageError } from "./review-stage.js";
+import { ClaudeAdapter, AdapterError } from "@change-assurance/adapter-claude";
 import { GitError } from "@change-assurance/core";
 
 function printUsage(): void {
@@ -11,6 +13,7 @@ Usage: ca <command> [options]
 Commands:
   review prepare    Prepare a review run
   review verify     Verify a review run
+  review stage      Run a review stage
 
 Options:
   --help            Show this help message
@@ -20,6 +23,9 @@ Prepare:
 
 Verify:
   ca review verify --run <run-id>
+
+Stage:
+  ca review stage --run <run-id> --stage change-map --engine claude
 `);
 }
 
@@ -167,6 +173,63 @@ if (command === "review") {
       }
       process.exit(1);
     }
+  } else if (subcommand === "stage") {
+    const stageArgs = args.slice(2);
+    if (stageArgs.includes("--help")) {
+      printStageUsage();
+      process.exit(0);
+    }
+
+    let runId: string | undefined;
+    let stage: string | undefined;
+    let engine: string | undefined;
+    for (let i = 0; i < stageArgs.length; i++) {
+      if (stageArgs[i] === "--run" && stageArgs[i + 1]) {
+        runId = stageArgs[++i];
+      } else if (stageArgs[i] === "--stage" && stageArgs[i + 1]) {
+        stage = stageArgs[++i];
+      } else if (stageArgs[i] === "--engine" && stageArgs[i + 1]) {
+        engine = stageArgs[++i];
+      }
+    }
+
+    if (!runId || !stage || !engine) {
+      console.error("Error: --run, --stage, and --engine are required");
+      printStageUsage();
+      process.exit(1);
+    }
+
+    if (stage !== "change-map") {
+      console.error(`Error: Unsupported stage: ${stage}. Only change-map is supported.`);
+      process.exit(1);
+    }
+
+    if (engine !== "claude") {
+      console.error(`Error: Unsupported engine: ${engine}. Only claude is supported.`);
+      process.exit(1);
+    }
+
+    try {
+      const adapter = new ClaudeAdapter();
+      const caps = adapter.detectCapabilities();
+      if (!caps.available) {
+        console.error("Error: Claude CLI not available");
+        process.exit(1);
+      }
+
+      const { stageArtifactPath } = await reviewStage({ runId, stage: stage as any, adapter });
+      console.log(`Stage completed: ${stage}`);
+      console.log(`Artifact: ${stageArtifactPath}`);
+    } catch (error) {
+      if (error instanceof StageError || error instanceof AdapterError) {
+        console.error(`Error: ${error.message}`);
+      } else if (error instanceof Error) {
+        console.error("Unexpected error:", error.message);
+      } else {
+        console.error("Unexpected error:", error);
+      }
+      process.exit(1);
+    }
   } else {
     console.error(`Unknown subcommand: ${subcommand}`);
     printUsage();
@@ -176,4 +239,19 @@ if (command === "review") {
   console.error(`Unknown command: ${command}`);
   printUsage();
   process.exit(1);
+}
+
+function printStageUsage(): void {
+  console.log(`
+Usage: ca review stage --run <run-id> --stage <stage> --engine <engine>
+
+Options:
+  --run <run-id>      Run ID from prepare step
+  --stage <stage>     Stage to run (currently only change-map)
+  --engine <engine>   Engine to use (currently only claude)
+  --help              Show this help message
+
+Example:
+  ca review stage --run abc123 --stage change-map --engine claude
+`);
 }

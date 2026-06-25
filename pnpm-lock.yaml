@@ -35,6 +35,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@change-assurance/adapter-claude':
+        specifier: workspace:*
+        version: link:../adapter-claude
       '@change-assurance/core':
         specifier: workspace:*
         version: link:../core
