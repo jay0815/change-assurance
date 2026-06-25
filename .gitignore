@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.change-assurance/
+.DS_Store
+*.log
