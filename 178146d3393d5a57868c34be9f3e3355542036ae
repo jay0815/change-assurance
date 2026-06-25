@@ -1,0 +1,24 @@
+.gitignore
+  77ac022c9952fb58 1-6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "178146d3393d5a57868c34be9f3e3355542036ae",
+  "prompts": {
+    "77ac022c9952fb58": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7dd5359e-98af-49f8-beae-ec8156c9a9ea",
+        "model": "mimo-v2.5-pro"
+      },
+      "human_author": "guanchengqian",
+      "messages": [],
+      "total_additions": 865,
+      "total_deletions": 245,
+      "accepted_lines": 504,
+      "overriden_lines": 7,
+      "messages_url": "http://10.1.138.136:9188/cas/7ea4569eab34e150246634a980dc6ac39d5e617fa3ef30db694b31c835295805"
+    }
+  }
+}
