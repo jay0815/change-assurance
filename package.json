@@ -2,16 +2,23 @@
   "name": "change-assurance",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@10.26.2",
   "scripts": {
-    "build": "pnpm -r run build",
-    "typecheck": "pnpm -r run typecheck",
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
     "test": "pnpm -r run test",
-    "lint": "pnpm -r run lint",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
     "ca": "node packages/cli/dist/index.js"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",
-    "typescript": "^6.0.3"
-  }
+    "oxfmt": "^0.56.0",
+    "oxlint": "^1.71.0",
+    "typescript": "^6.0.3",
+    "vite": "8.1.0",
+    "vitest": "^4.1.6"
+  },
+  "packageManager": "pnpm@10.26.2"
 }

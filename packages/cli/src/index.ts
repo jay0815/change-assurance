@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { reviewPrepare, PrepareError } from './review-prepare.js';
-import { GitError } from '@change-assurance/core';
+import { reviewPrepare, PrepareError } from "./review-prepare.js";
+import { GitError } from "@change-assurance/core";
 
 function printUsage(): void {
   console.log(`
@@ -20,9 +20,9 @@ Example:
 function parseArgs(args: string[]): { base?: string; head?: string } {
   const result: { base?: string; head?: string } = {};
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--base' && args[i + 1]) {
+    if (args[i] === "--base" && args[i + 1]) {
       result.base = args[++i];
-    } else if (args[i] === '--head' && args[i + 1]) {
+    } else if (args[i] === "--head" && args[i + 1]) {
       result.head = args[++i];
     }
   }
@@ -31,7 +31,7 @@ function parseArgs(args: string[]): { base?: string; head?: string } {
 
 const args = process.argv.slice(2);
 
-if (args.includes('--help') || args.length === 0) {
+if (args.includes("--help") || args.length === 0) {
   printUsage();
   process.exit(0);
 }
@@ -39,7 +39,7 @@ if (args.includes('--help') || args.length === 0) {
 const { base, head } = parseArgs(args);
 
 if (!base || !head) {
-  console.error('Error: --base and --head are required');
+  console.error("Error: --base and --head are required");
   printUsage();
   process.exit(1);
 }
@@ -52,9 +52,9 @@ try {
   if (error instanceof PrepareError || error instanceof GitError) {
     console.error(`Error: ${error.message}`);
   } else if (error instanceof Error) {
-    console.error('Unexpected error:', error.message);
+    console.error("Unexpected error:", error.message);
   } else {
-    console.error('Unexpected error:', error);
+    console.error("Unexpected error:", error);
   }
   process.exit(1);
 }

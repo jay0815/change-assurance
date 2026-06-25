@@ -21,7 +21,7 @@ export interface GitState {
 
 export interface ChangedFile {
   path: string;
-  status: 'added' | 'modified' | 'deleted' | 'renamed';
+  status: "added" | "modified" | "deleted" | "renamed";
   additions: number;
   deletions: number;
   oldPath?: string;
@@ -32,5 +32,5 @@ export interface ReviewRun {
   baseRef: string;
   headRef: string;
   createdAt: string;
-  status: 'created' | 'verified' | 'reviewed' | 'completed';
+  status: "created" | "verified" | "reviewed" | "completed";
 }

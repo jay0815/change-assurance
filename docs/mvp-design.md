@@ -16,10 +16,10 @@ base/head
 
 核心约束：
 
-* Claude Code 负责语义判断，不负责定义事实。
-* Harness 负责输入冻结、命令执行、artifact 写入和规则校验。
-* 所有正式结论必须来自已保存的 artifact。
-* dry run 不修改业务代码，不回写 PR/MR。
+- Claude Code 负责语义判断，不负责定义事实。
+- Harness 负责输入冻结、命令执行、artifact 写入和规则校验。
+- 所有正式结论必须来自已保存的 artifact。
+- dry run 不修改业务代码，不回写 PR/MR。
 
 ---
 
@@ -110,9 +110,9 @@ input-manifest.json
 
 职责：
 
-* 确认实际审查范围。
-* 冻结本次 run 使用的 Git 输入与 Policy。
-* 生成唯一 `runId`。
+- 确认实际审查范围。
+- 冻结本次 run 使用的 Git 输入与 Policy。
+- 生成唯一 `runId`。
 
 ---
 
@@ -122,9 +122,9 @@ input-manifest.json
 
 职责：
 
-* 根据 Policy 计算必须执行的验证命令。
-* 仅运行白名单命令。
-* 保存 stdout、stderr、exit code、执行状态。
+- 根据 Policy 计算必须执行的验证命令。
+- 仅运行白名单命令。
+- 保存 stdout、stderr、exit code、执行状态。
 
 验证状态只能是：
 
@@ -308,7 +308,7 @@ Harness 负责校验：
 ```ts
 type Issue = {
   id: string;
-  severity: 'blocking' | 'material' | 'advisory' | 'needs_context';
+  severity: "blocking" | "material" | "advisory" | "needs_context";
   title: string;
 
   location?: {
@@ -322,7 +322,7 @@ type Issue = {
   recommendation?: string;
 
   evidenceRefs: string[];
-  confidence: 'high' | 'medium' | 'low';
+  confidence: "high" | "medium" | "low";
 };
 ```
 
@@ -331,7 +331,7 @@ type Issue = {
 ```ts
 type Evidence = {
   id: string;
-  kind: 'diff' | 'source' | 'verification' | 'policy' | 'requirement';
+  kind: "diff" | "source" | "verification" | "policy" | "requirement";
   sourcePath: string;
   excerpt?: string;
 };
@@ -342,7 +342,7 @@ type Evidence = {
 ```ts
 type CoverageItem = {
   area: string;
-  status: 'reviewed' | 'tool_verified' | 'uncovered' | 'needs_context';
+  status: "reviewed" | "tool_verified" | "uncovered" | "needs_context";
   evidenceRefs: string[];
   reason?: string;
 };

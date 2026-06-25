@@ -1,19 +1,17 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdirSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { createHash } from "node:crypto";
 import {
   generateRunId,
   getInputDir,
-  getInputArtifactPath,
   INPUT_ARTIFACTS,
   isGitRepository,
   refExists,
   collectGitState,
   getDiff,
   getChangedFiles,
-  GitError,
-} from '@change-assurance/core';
-import { loadPolicy } from './policy.js';
-import { createHash } from 'node:crypto';
+} from "@change-assurance/core";
+import { loadPolicy } from "./policy.js";
 
 export interface PrepareOptions {
   base: string;
@@ -23,19 +21,22 @@ export interface PrepareOptions {
 export class PrepareError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'PrepareError';
+    this.name = "PrepareError";
   }
 }
 
 function sha256(content: string): string {
-  return createHash('sha256').update(content).digest('hex');
+  return createHash("sha256").update(content).digest("hex");
 }
 
-export function reviewPrepare(options: PrepareOptions): { runId: string; inputDir: string } {
+export function reviewPrepare(options: PrepareOptions): {
+  runId: string;
+  inputDir: string;
+} {
   const cwd = process.cwd();
 
   if (!isGitRepository()) {
-    throw new PrepareError('Not a git repository');
+    throw new PrepareError("Not a git repository");
   }
 
   if (!refExists(options.base)) {
@@ -69,18 +70,21 @@ export function reviewPrepare(options: PrepareOptions): { runId: string; inputDi
 
   writeFileSync(
     resolve(inputDir, INPUT_ARTIFACTS.INPUT_MANIFEST),
-    JSON.stringify(inputManifest, null, 2)
+    JSON.stringify(inputManifest, null, 2),
   );
   writeFileSync(resolve(inputDir, INPUT_ARTIFACTS.DIFF_PATCH), diff);
   writeFileSync(
     resolve(inputDir, INPUT_ARTIFACTS.CHANGED_FILES),
-    JSON.stringify(changedFiles, null, 2)
+    JSON.stringify(changedFiles, null, 2),
   );
   writeFileSync(
     resolve(inputDir, INPUT_ARTIFACTS.GIT_STATE),
-    JSON.stringify(gitState, null, 2)
+    JSON.stringify(gitState, null, 2),
   );
-  writeFileSync(resolve(inputDir, INPUT_ARTIFACTS.POLICY_SNAPSHOT), policySnapshot);
+  writeFileSync(
+    resolve(inputDir, INPUT_ARTIFACTS.POLICY_SNAPSHOT),
+    policySnapshot,
+  );
 
   return { runId, inputDir };
 }

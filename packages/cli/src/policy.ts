@@ -1,6 +1,6 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { parse } from 'yaml';
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { parse } from "yaml";
 
 export interface PolicyConfig {
   defaultBaseRef?: string;
@@ -15,12 +15,12 @@ export interface VerificationCommand {
   required: boolean;
 }
 
-const POLICY_FILE = 'change-assurance.yaml';
+const POLICY_FILE = "change-assurance.yaml";
 
 export function loadPolicy(cwd: string): PolicyConfig {
   const policyPath = resolve(cwd, POLICY_FILE);
   try {
-    const content = readFileSync(policyPath, 'utf-8');
+    const content = readFileSync(policyPath, "utf-8");
     return parse(content) as PolicyConfig;
   } catch {
     return {};

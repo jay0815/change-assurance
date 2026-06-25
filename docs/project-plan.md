@@ -27,36 +27,38 @@ pre_merge_review + dry_run + Claude Code
 
 ### 要完成
 
-* 提供统一 CLI：`ca review ...`
-* 支持 base/head diff 审查。
-* 支持加载仓库级 policy。
-* 支持冻结审查输入与生成 run artifact。
-* 支持白名单验证命令执行与结果记录。
-* 支持 Claude Code 作为语义审查执行器。
-* 支持最小审查阶段：
+- 提供统一 CLI：`ca review ...`
+- 支持 base/head diff 审查。
+- 支持加载仓库级 policy。
+- 支持冻结审查输入与生成 run artifact。
+- 支持白名单验证命令执行与结果记录。
+- 支持 Claude Code 作为语义审查执行器。
+- 支持最小审查阶段：
 
-  * change map
-  * behavior / regression review
-  * test effectiveness review
-  * evidence audit
-  * synthesis
-* 输出：
+  - change map
+  - behavior / regression review
+  - test effectiveness review
+  - evidence audit
+  - synthesis
 
-  * review report
-  * issue ledger
-  * evidence ledger
-  * coverage ledger
-* 建立少量 golden cases 做回归验证。
+- 输出：
+
+  - review report
+  - issue ledger
+  - evidence ledger
+  - coverage ledger
+
+- 建立少量 golden cases 做回归验证。
 
 ### 暂不完成
 
-* Codex adapter。
-* PR/MR 评论回写。
-* CI required check。
-* 自动修复。
-* 多 Agent 并行调度。
-* Coding Agent delivery acceptance。
-* 复杂领域专项审查器。
+- Codex adapter。
+- PR/MR 评论回写。
+- CI required check。
+- 自动修复。
+- 多 Agent 并行调度。
+- Coding Agent delivery acceptance。
+- 复杂领域专项审查器。
 
 ---
 
