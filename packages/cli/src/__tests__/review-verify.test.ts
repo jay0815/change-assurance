@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { VerifyError } from "../review-verify.js";
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { reviewVerify } from "../review-verify.js";
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
@@ -110,33 +111,30 @@ describe("reviewVerify", () => {
     return runId;
   }
 
-  it("should throw VerifyError when run not found", async () => {
-    const { reviewVerify } = await import("../review-verify.js");
+  it("should throw VerifyError when run not found", () => {
     expect(() => reviewVerify({ runId: "nonexistent" })).toThrow(VerifyError);
   });
 
-  it("should block when HEAD changed after prepare", async () => {
+  it("should block when HEAD changed after prepare", () => {
     const runId = createRunFixture({ headCommit: "original-commit" });
     mockGetHeadCommit.mockReturnValue("different-commit");
 
-    const { reviewVerify } = await import("../review-verify.js");
     const ledger = reviewVerify({ runId });
 
     expect(ledger.runStatus).toBe("blocked");
     expect(ledger.preconditionErrors.some((err) => err.includes("HEAD changed"))).toBe(true);
   });
 
-  it("should block when working tree is dirty", async () => {
+  it("should block when working tree is dirty", () => {
     const runId = createRunFixture({ dirty: true });
 
-    const { reviewVerify } = await import("../review-verify.js");
     const ledger = reviewVerify({ runId });
 
     expect(ledger.runStatus).toBe("blocked");
     expect(ledger.preconditionErrors).toContain("Git working tree is dirty");
   });
 
-  it("should execute commands that match pathsAny", async () => {
+  it("should execute commands that match pathsAny", () => {
     const runId = createRunFixture({
       policy: {
         version: 1,
@@ -148,16 +146,21 @@ describe("reviewVerify", () => {
       },
     });
 
-    const { reviewVerify } = await import("../review-verify.js");
     const ledger = reviewVerify({ runId });
 
     expect(ledger.runStatus).toBe("completed");
     expect(ledger.commands).toHaveLength(1);
     expect(ledger.commands[0].status).toBe("passed");
     expect(ledger.commands[0].exitCode).toBe(0);
+
+    // Verify log files were created
+    const stdoutPath = join(tempDir, ".change-assurance", "runs", runId, "verification", "logs", "typecheck.stdout.log");
+    const stderrPath = join(tempDir, ".change-assurance", "runs", runId, "verification", "logs", "typecheck.stderr.log");
+    expect(existsSync(stdoutPath)).toBe(true);
+    expect(existsSync(stderrPath)).toBe(true);
   });
 
-  it("should mark commands as not_required when pathsAny not matched", async () => {
+  it("should mark commands as not_required when pathsAny not matched", () => {
     const runId = createRunFixture({
       policy: {
         version: 1,
@@ -169,14 +172,17 @@ describe("reviewVerify", () => {
       },
     });
 
-    const { reviewVerify } = await import("../review-verify.js");
     const ledger = reviewVerify({ runId });
 
     expect(ledger.commands[0].status).toBe("not_required");
     expect(ledger.summary.notRequired).toBe(1);
+
+    // Verify log files were NOT created
+    const stdoutPath = join(tempDir, ".change-assurance", "runs", runId, "verification", "logs", "typecheck.stdout.log");
+    expect(existsSync(stdoutPath)).toBe(false);
   });
 
-  it("should record failed commands", async () => {
+  it("should record failed commands", () => {
     const runId = createRunFixture({
       policy: {
         version: 1,
@@ -188,7 +194,6 @@ describe("reviewVerify", () => {
       },
     });
 
-    const { reviewVerify } = await import("../review-verify.js");
     const ledger = reviewVerify({ runId });
 
     expect(ledger.commands[0].status).toBe("failed");
