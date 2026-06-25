@@ -1,0 +1,38 @@
+packages/core/src/types.ts
+  77ac022c9952fb58 37-95
+packages/cli/src/index.ts
+  77ac022c9952fb58 4,9-27,40-51,61-63,65-138,140-169,171-173,175-177
+packages/core/src/artifact.ts
+  77ac022c9952fb58 21-32,40-43
+packages/core/src/index.ts
+  77ac022c9952fb58 4
+packages/core/src/glob.ts
+  77ac022c9952fb58 1-14
+packages/cli/src/policy.ts
+  77ac022c9952fb58 4,6,16
+packages/cli/src/review-verify.ts
+  77ac022c9952fb58 1-285
+change-assurance.yaml
+  77ac022c9952fb58 1,3-4,6-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "480dd5314fb0a1a1026a4fe05a05fc9b03216f99",
+  "prompts": {
+    "77ac022c9952fb58": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7dd5359e-98af-49f8-beae-ec8156c9a9ea",
+        "model": "mimo-v2.5-pro"
+      },
+      "human_author": "guanchengqian",
+      "messages": [],
+      "total_additions": 554,
+      "total_deletions": 58,
+      "accepted_lines": 551,
+      "overriden_lines": 0,
+      "messages_url": "http://10.1.138.136:9188/cas/3cccee240b61b965bcbe72ea9aefc97f46793b42697677f4e92c999ebc71ca37"
+    }
+  }
+}
