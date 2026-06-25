@@ -203,14 +203,14 @@ pnpm --filter @change-assurance/cli add @change-assurance/core@workspace:*
 ```bash
 # 准备 review run
 ca review prepare --base origin/main --head HEAD
+
+# 验证 review run
+ca review verify --run <run-id>
 ```
 
 计划实现：
 
 ```bash
-# 验证命令执行
-ca review verify --run <run-id>
-
 # 语义审查阶段
 ca review stage --run <run-id> --stage <stage> --engine claude
 
