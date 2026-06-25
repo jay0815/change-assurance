@@ -123,7 +123,7 @@ describe("reviewVerify", () => {
     const ledger = reviewVerify({ runId });
 
     expect(ledger.runStatus).toBe("blocked");
-    expect(ledger.preconditionErrors.length).toBeGreaterThan(0);
+    expect(ledger.preconditionErrors.some((err) => err.includes("HEAD changed"))).toBe(true);
   });
 
   it("should block when working tree is dirty", async () => {
@@ -151,12 +151,6 @@ describe("reviewVerify", () => {
     const { reviewVerify } = await import("../review-verify.js");
     const ledger = reviewVerify({ runId });
 
-    // Debug output
-    console.log("ledger.runStatus:", ledger.runStatus);
-    console.log("ledger.preconditionErrors:", ledger.preconditionErrors);
-    console.log("mockGetHeadCommit called:", mockGetHeadCommit.mock.calls);
-    console.log("mockIsWorkingTreeDirty called:", mockIsWorkingTreeDirty.mock.calls);
-
     expect(ledger.runStatus).toBe("completed");
     expect(ledger.commands).toHaveLength(1);
     expect(ledger.commands[0].status).toBe("passed");
@@ -177,11 +171,6 @@ describe("reviewVerify", () => {
 
     const { reviewVerify } = await import("../review-verify.js");
     const ledger = reviewVerify({ runId });
-
-    // Debug output
-    console.log("ledger.runStatus:", ledger.runStatus);
-    console.log("ledger.preconditionErrors:", ledger.preconditionErrors);
-    console.log("ledger.commands:", ledger.commands);
 
     expect(ledger.commands[0].status).toBe("not_required");
     expect(ledger.summary.notRequired).toBe(1);
