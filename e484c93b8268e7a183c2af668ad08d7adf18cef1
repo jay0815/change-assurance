@@ -1,0 +1,26 @@
+packages/cli/src/review-stage.ts
+  77ac022c9952fb58 78-82,84-85
+CLAUDE.md
+  77ac022c9952fb58 209-211
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "e484c93b8268e7a183c2af668ad08d7adf18cef1",
+  "prompts": {
+    "77ac022c9952fb58": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7dd5359e-98af-49f8-beae-ec8156c9a9ea",
+        "model": "mimo-v2.5-pro"
+      },
+      "human_author": "guanchengqian",
+      "messages": [],
+      "total_additions": 10,
+      "total_deletions": 5,
+      "accepted_lines": 10,
+      "overriden_lines": 0,
+      "messages_url": "http://10.1.138.136:9188/cas/58b833d8b8061cd0d41f4666903f6e2047330962a903725b0932da37a4bbfda7"
+    }
+  }
+}
