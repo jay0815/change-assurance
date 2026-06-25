@@ -1,17 +1,28 @@
-# Change Assurance Policy
-defaultBaseRef: origin/main
+version: 1
 
-verificationCommands:
-  - id: typecheck
-    name: Type Check
-    command: "pnpm typecheck"
-    required: true
-  - id: test
-    name: Test
-    command: "pnpm test"
-    required: true
+review:
+  defaultBaseRef: origin/main
 
-ignorePaths:
-  - "node_modules/"
-  - "dist/"
-  - ".change-assurance/"
+scope:
+  ignore:
+    - "**/dist/**"
+    - "**/coverage/**"
+    - "**/.change-assurance/**"
+
+verification:
+  commands:
+    - id: typecheck
+      argv: ["pnpm", "typecheck"]
+      when:
+        pathsAny:
+          - "**/*.ts"
+          - "**/*.tsx"
+
+    - id: test
+      argv: ["pnpm", "test"]
+      when:
+        pathsAny:
+          - "packages/**"
+
+decision:
+  requireExecutedVerificationEvidence: true

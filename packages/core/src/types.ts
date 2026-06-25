@@ -34,3 +34,62 @@ export interface ReviewRun {
   createdAt: string;
   status: "created" | "verified" | "reviewed" | "completed";
 }
+
+// Policy types
+export interface PolicyConfig {
+  version: number;
+  review?: {
+    defaultBaseRef?: string;
+  };
+  scope?: {
+    ignore?: string[];
+  };
+  verification?: {
+    commands?: VerificationCommandPolicy[];
+  };
+  decision?: {
+    requireExecutedVerificationEvidence?: boolean;
+  };
+}
+
+export interface VerificationCommandPolicy {
+  id: string;
+  argv: string[];
+  when?: {
+    pathsAny?: string[];
+  };
+}
+
+// Verification types
+export type VerificationStatus = "passed" | "failed" | "skipped" | "not_required";
+
+export interface VerificationCommandResult {
+  id: string;
+  argv: string[];
+  required: boolean;
+  status: VerificationStatus;
+  selectionReason: string;
+  startedAt?: string;
+  endedAt?: string;
+  durationMs?: number;
+  exitCode?: number;
+  stdoutPath?: string;
+  stderrPath?: string;
+  skipReason?: string;
+}
+
+export interface VerificationLedger {
+  runId: string;
+  createdAt: string;
+  runStatus: "completed" | "blocked" | "invalidated";
+  policySnapshotHash: string;
+  preconditionErrors: string[];
+  commands: VerificationCommandResult[];
+  summary: {
+    passed: number;
+    failed: number;
+    skipped: number;
+    notRequired: number;
+  };
+  workspaceChangedAfterVerify: boolean;
+}
