@@ -17,6 +17,14 @@ vi.mock("@change-assurance/core", async () => {
   };
 });
 
+vi.mock("node:child_process", async () => {
+  const actual = await vi.importActual("node:child_process");
+  return {
+    ...actual,
+    spawnSync: vi.fn(),
+  };
+});
+
 function sha256(content: string): string {
   return createHash("sha256").update(content).digest("hex");
 }
@@ -26,16 +34,23 @@ describe("reviewVerify", () => {
   let originalCwd: string;
   let mockGetHeadCommit: ReturnType<typeof vi.fn>;
   let mockIsWorkingTreeDirty: ReturnType<typeof vi.fn>;
+  let mockSpawnSync: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     originalCwd = process.cwd();
     tempDir = mkdtempSync(join(tmpdir(), "change-assurance-verify-test-"));
     process.chdir(tempDir);
 
+    // Get mock references
     mockGetHeadCommit = vi.mocked(core.getHeadCommit);
     mockIsWorkingTreeDirty = vi.mocked(core.isWorkingTreeDirty);
+    const childProcess = await import("node:child_process");
+    mockSpawnSync = vi.mocked(childProcess.spawnSync);
+
+    // Reset all mocks before each test
     mockGetHeadCommit.mockReset();
     mockIsWorkingTreeDirty.mockReset();
+    mockSpawnSync.mockReset();
   });
 
   afterEach(() => {
@@ -135,12 +150,19 @@ describe("reviewVerify", () => {
   });
 
   it("should execute commands that match pathsAny", () => {
+    // Mock spawnSync to return success
+    mockSpawnSync.mockReturnValue({
+      status: 0,
+      stdout: "typecheck output",
+      stderr: "",
+    });
+
     const runId = createRunFixture({
       policy: {
         version: 1,
         verification: {
           commands: [
-            { id: "typecheck", argv: ["echo", "typecheck"], when: { pathsAny: ["**/*.ts"] } },
+            { id: "typecheck", argv: ["pnpm", "typecheck"], when: { pathsAny: ["**/*.ts"] } },
           ],
         },
       },
@@ -183,12 +205,19 @@ describe("reviewVerify", () => {
   });
 
   it("should record failed commands", () => {
+    // Mock spawnSync to return failure
+    mockSpawnSync.mockReturnValue({
+      status: 1,
+      stdout: "error output",
+      stderr: "error message",
+    });
+
     const runId = createRunFixture({
       policy: {
         version: 1,
         verification: {
           commands: [
-            { id: "fail-cmd", argv: ["node", "-e", "process.exit(1)"], when: { pathsAny: ["**/*.ts"] } },
+            { id: "fail-cmd", argv: ["failing-command"], when: { pathsAny: ["**/*.ts"] } },
           ],
         },
       },
