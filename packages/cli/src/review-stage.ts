@@ -75,9 +75,14 @@ function validateChangeMap(output: any): string[] {
 
 function validateEvidenceRefs(output: ChangeMap, runDir: string): string[] {
   const errors: string[] = [];
+
+  if (!output.behaviorChanges || !output.riskAreas) {
+    return errors;
+  }
+
   const allRefs = [
-    ...output.behaviorChanges.flatMap((b) => b.evidenceRefs),
-    ...output.riskAreas.flatMap((r) => r.evidenceRefs),
+    ...(output.behaviorChanges ?? []).flatMap((b) => b.evidenceRefs ?? []),
+    ...(output.riskAreas ?? []).flatMap((r) => r.evidenceRefs ?? []),
   ];
 
   for (const ref of allRefs) {

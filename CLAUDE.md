@@ -206,14 +206,14 @@ ca review prepare --base origin/main --head HEAD
 
 # 验证 review run
 ca review verify --run <run-id>
+
+# 语义审查阶段（change-map）
+ca review stage --run <run-id> --stage change-map --engine claude
 ```
 
 计划实现：
 
 ```bash
-# 语义审查阶段
-ca review stage --run <run-id> --stage <stage> --engine claude
-
 # 校验审查结果
 ca review validate --run <run-id>
 
