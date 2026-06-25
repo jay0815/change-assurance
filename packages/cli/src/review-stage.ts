@@ -95,6 +95,56 @@ function validateEvidenceRefs(output: ChangeMap, runDir: string): string[] {
   return errors;
 }
 
+function validateAdequacy(output: ChangeMap, changedFiles: Array<{ path: string }>, manifest: InputManifest): string[] {
+  const errors: string[] = [];
+
+  // Rule 1: changedModules must not be empty when there are changes
+  if (changedFiles.length > 0 && (!output.changedModules || output.changedModules.length === 0)) {
+    errors.push("changedModules must not be empty when diff has changes");
+  }
+
+  // Rule 1: each changedModule path must be in changedFiles
+  const changedPaths = new Set(changedFiles.map((f) => f.path));
+  for (const mod of output.changedModules ?? []) {
+    if (!changedPaths.has(mod.path)) {
+      errors.push(`changedModule path not in changed files: ${mod.path}`);
+    }
+    if (!mod.role || mod.role.trim() === "") {
+      errors.push(`changedModule has empty role: ${mod.path}`);
+    }
+    if (!mod.changeSummary || mod.changeSummary.trim() === "") {
+      errors.push(`changedModule has empty changeSummary: ${mod.path}`);
+    }
+  }
+
+  // Rule 2: if all analysis arrays are empty, must have explanation
+  const allAnalysisEmpty =
+    (output.behaviorChanges ?? []).length === 0 &&
+    (output.riskAreas ?? []).length === 0 &&
+    (output.reviewPriorities ?? []).length === 0;
+
+  if (allAnalysisEmpty) {
+    const hasExplanation =
+      (output.assumptions ?? []).length > 0 ||
+      (output.uncoveredContext ?? []).length > 0;
+    if (!hasExplanation) {
+      errors.push("All analysis arrays are empty but no explanation in assumptions or uncoveredContext");
+    }
+  }
+
+  // Rule 3: sourceArtifacts hash validation
+  if (output.sourceArtifacts) {
+    if (output.sourceArtifacts.inputManifestHash !== manifest.policySnapshotHash) {
+      errors.push("sourceArtifacts.inputManifestHash mismatch");
+    }
+    if (output.sourceArtifacts.policySnapshotHash !== manifest.policySnapshotHash) {
+      errors.push("sourceArtifacts.policySnapshotHash mismatch");
+    }
+  }
+
+  return errors;
+}
+
 export async function reviewStage(options: StageOptions): Promise<{ stageArtifactPath: string }> {
   const cwd = process.cwd();
   const { runId, stage, adapter } = options;
@@ -150,7 +200,8 @@ export async function reviewStage(options: StageOptions): Promise<{ stageArtifac
   const stagesDir = resolve(cwd, getStagesDir(runId));
   mkdirSync(stagesDir, { recursive: true });
 
-  let rawOutput: unknown;
+  let rawMessages: unknown;
+  let structuredOutput: unknown;
   try {
     const result = await adapter.runStage({
       stage,
@@ -158,7 +209,8 @@ export async function reviewStage(options: StageOptions): Promise<{ stageArtifac
       prompt,
       schema: CHANGE_MAP_SCHEMA,
     });
-    rawOutput = result.rawOutput;
+    rawMessages = result.rawOutput;
+    structuredOutput = result.structuredOutput;
   } catch (error) {
     const rawPath = resolve(cwd, getStageRawArtifactPath(runId, stage));
     writeFileSync(rawPath, JSON.stringify({ error: String(error) }, null, 2));
@@ -166,17 +218,24 @@ export async function reviewStage(options: StageOptions): Promise<{ stageArtifac
   }
 
   const rawPath = resolve(cwd, getStageRawArtifactPath(runId, stage));
-  writeFileSync(rawPath, JSON.stringify(rawOutput, null, 2));
+  writeFileSync(rawPath, JSON.stringify(rawMessages, null, 2));
 
-  const validationErrors = validateChangeMap(rawOutput);
+  const validationErrors = validateChangeMap(structuredOutput);
   if (validationErrors.length > 0) {
     throw new StageError(`Invalid output: ${validationErrors.join(", ")}`);
   }
 
-  const changeMap = rawOutput as ChangeMap;
+  const changeMap = structuredOutput as ChangeMap;
   const refErrors = validateEvidenceRefs(changeMap, runDir);
   if (refErrors.length > 0) {
     throw new StageError(`Invalid evidenceRefs: ${refErrors.join(", ")}`);
+  }
+
+  // Adequacy gate
+  const changedFiles = JSON.parse(changedFilesContent) as Array<{ path: string }>;
+  const adequacyErrors = validateAdequacy(changeMap, changedFiles, manifest);
+  if (adequacyErrors.length > 0) {
+    throw new StageError(`Adequacy gate failed: ${adequacyErrors.join(", ")}`);
   }
 
   const artifact: ChangeMap = {

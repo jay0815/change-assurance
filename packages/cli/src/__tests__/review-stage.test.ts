@@ -126,7 +126,7 @@ describe("reviewStage", () => {
       riskAreas: [],
       reviewPriorities: [],
       uncoveredContext: [],
-      assumptions: [],
+      assumptions: ["Minimal change, no behavior impact"],
     };
 
     const adapter = createFakeAdapter(adapterOutput);
@@ -188,5 +188,112 @@ describe("reviewStage", () => {
 
     const rawPath = join(tempDir, ".change-assurance", "runs", runId, "stages", "change-map.raw.json");
     expect(readFileSync(rawPath, "utf-8")).toContain("error");
+  });
+
+  // Adequacy gate tests
+
+  it("should reject empty changedModules when diff has changes", async () => {
+    const runId = createRunFixture();
+    const adapterOutput = {
+      changedModules: [],
+      behaviorChanges: [],
+      riskAreas: [],
+      reviewPriorities: [],
+      uncoveredContext: [],
+      assumptions: [],
+    };
+
+    const adapter = createFakeAdapter(adapterOutput);
+    await expect(
+      reviewStage({ runId, stage: "change-map", adapter }),
+    ).rejects.toThrow(StageError);
+  });
+
+  it("should reject changedModules referencing unchaged files", async () => {
+    const runId = createRunFixture();
+    const adapterOutput = {
+      changedModules: [{ path: "src/other.ts", role: "module", changeSummary: "changed" }],
+      behaviorChanges: [],
+      riskAreas: [],
+      reviewPriorities: [],
+      uncoveredContext: [],
+      assumptions: [],
+    };
+
+    const adapter = createFakeAdapter(adapterOutput);
+    await expect(
+      reviewStage({ runId, stage: "change-map", adapter }),
+    ).rejects.toThrow(StageError);
+  });
+
+  it("should reject empty analysis arrays without explanation", async () => {
+    const runId = createRunFixture();
+    const adapterOutput = {
+      changedModules: [{ path: "src/index.ts", role: "entry", changeSummary: "modified" }],
+      behaviorChanges: [],
+      riskAreas: [],
+      reviewPriorities: [],
+      uncoveredContext: [],
+      assumptions: [],
+    };
+
+    const adapter = createFakeAdapter(adapterOutput);
+    await expect(
+      reviewStage({ runId, stage: "change-map", adapter }),
+    ).rejects.toThrow(StageError);
+  });
+
+  it("should accept empty analysis arrays with explanation in assumptions", async () => {
+    const runId = createRunFixture();
+    const adapterOutput = {
+      changedModules: [{ path: "src/index.ts", role: "entry", changeSummary: "modified" }],
+      behaviorChanges: [],
+      riskAreas: [],
+      reviewPriorities: [],
+      uncoveredContext: [],
+      assumptions: ["No behavior changes identified due to limited diff context"],
+    };
+
+    const adapter = createFakeAdapter(adapterOutput);
+    const result = await reviewStage({ runId, stage: "change-map", adapter });
+    expect(result.stageArtifactPath).toContain("change-map.json");
+  });
+
+  it("should reject sourceArtifacts with wrong hashes", async () => {
+    const runId = createRunFixture();
+    const adapterOutput = {
+      changedModules: [{ path: "src/index.ts", role: "entry", changeSummary: "modified" }],
+      behaviorChanges: [],
+      riskAreas: [],
+      reviewPriorities: [],
+      uncoveredContext: [],
+      assumptions: ["test"],
+      sourceArtifacts: {
+        inputManifestHash: "wrong-hash",
+        policySnapshotHash: "wrong-hash",
+      },
+    };
+
+    const adapter = createFakeAdapter(adapterOutput);
+    await expect(
+      reviewStage({ runId, stage: "change-map", adapter }),
+    ).rejects.toThrow(StageError);
+  });
+
+  it("should reject changedModules with empty role or changeSummary", async () => {
+    const runId = createRunFixture();
+    const adapterOutput = {
+      changedModules: [{ path: "src/index.ts", role: "", changeSummary: "" }],
+      behaviorChanges: [],
+      riskAreas: [],
+      reviewPriorities: [],
+      uncoveredContext: [],
+      assumptions: ["test"],
+    };
+
+    const adapter = createFakeAdapter(adapterOutput);
+    await expect(
+      reviewStage({ runId, stage: "change-map", adapter }),
+    ).rejects.toThrow(StageError);
   });
 });

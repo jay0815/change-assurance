@@ -58,7 +58,7 @@ export class ClaudeAdapter {
 
     const result = spawnSync(
       "claude",
-      ["-p", "--output-format", "json", "--json-schema", JSON.stringify(input.schema)],
+      ["-p", "--output-format", "stream-json", "--json-schema", JSON.stringify(input.schema)],
       {
         cwd: input.runDirectory,
         encoding: "utf-8",
@@ -72,10 +72,55 @@ export class ClaudeAdapter {
     }
 
     try {
-      const rawOutput = JSON.parse(result.stdout ?? "{}");
-      return { rawOutput, structuredOutput: rawOutput };
+      const stdout = (result.stdout ?? "").trim();
+      let rawOutput: unknown[];
+
+      // Try parsing as JSON array first
+      if (stdout.startsWith("[")) {
+        rawOutput = JSON.parse(stdout);
+      } else {
+        // stream-json format is one JSON object per line
+        const lines = stdout.split("\n");
+        rawOutput = lines.map((line) => JSON.parse(line));
+      }
+
+      // Extract structured output from stream-json format
+      const structuredOutput = this.extractStructuredOutput(rawOutput);
+      return { rawOutput, structuredOutput };
     } catch {
       throw new AdapterError("Failed to parse Claude CLI output as JSON");
     }
+  }
+
+  private extractStructuredOutput(messages: unknown[]): unknown {
+    // Find the assistant message with StructuredOutput tool use
+    for (const msg of messages) {
+      if (typeof msg !== "object" || msg === null) continue;
+
+      // Check for assistant type with message field
+      if ("type" in msg && (msg as any).type === "assistant" && "message" in msg) {
+        const message = (msg as any).message;
+        if (typeof message !== "object" || message === null) continue;
+
+        // Check for content array
+        if (!("content" in message) || !Array.isArray(message.content)) continue;
+
+        for (const block of message.content) {
+          if (typeof block !== "object" || block === null) continue;
+
+          // Check for tool_use with StructuredOutput
+          if (
+            "type" in block &&
+            (block as any).type === "tool_use" &&
+            "name" in block &&
+            (block as any).name === "StructuredOutput" &&
+            "input" in block
+          ) {
+            return (block as any).input;
+          }
+        }
+      }
+    }
+    return {};
   }
 }
