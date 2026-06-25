@@ -1,0 +1,9 @@
+{
+  "name": "@change-assurance/skills",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "echo 'no build required'",
+    "typecheck": "echo 'no typecheck required'"
+  }
+}

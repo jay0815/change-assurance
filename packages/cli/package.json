@@ -1,0 +1,16 @@
+{
+  "name": "@change-assurance/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "ca": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@change-assurance/core": "workspace:*",
+    "yaml": "^2.7.1"
+  }
+}

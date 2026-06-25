@@ -1,0 +1,17 @@
+# Change Assurance Policy
+defaultBaseRef: origin/main
+
+verificationCommands:
+  - id: typecheck
+    name: Type Check
+    command: "pnpm typecheck"
+    required: true
+  - id: test
+    name: Test
+    command: "pnpm test"
+    required: true
+
+ignorePaths:
+  - "node_modules/"
+  - "dist/"
+  - ".change-assurance/"
