@@ -127,6 +127,41 @@ function validateSourceEvidenceRefs(output: BehaviorReview, expectedCommit: stri
   return errors;
 }
 
+function validateTestReviewEvidenceRefs(output: TestReview, expectedCommit: string): string[] {
+  const errors: string[] = [];
+
+  const allRefs = [
+    ...output.reviewedBehaviors.flatMap((rb) => [...(rb.implementationEvidenceRefs ?? []), ...(rb.testEvidenceRefs ?? [])]),
+    ...output.findings.flatMap((f) => f.evidenceRefs ?? []),
+  ];
+
+  for (const ref of allRefs) {
+    const parsed = parseSourceEvidenceRef(ref);
+    if (!parsed) {
+      errors.push(`Invalid evidenceRef format: ${ref}`);
+      continue;
+    }
+
+    if (parsed.commit !== expectedCommit) {
+      errors.push(`evidenceRef commit mismatch: expected ${expectedCommit}, got ${parsed.commit} in ${ref}`);
+      continue;
+    }
+
+    if (!fileExistsAtCommit(parsed.commit, parsed.path)) {
+      errors.push(`evidenceRef path not found at commit: ${parsed.path} in ${ref}`);
+      continue;
+    }
+
+    const content = getFileContentAtCommit(parsed.commit, parsed.path);
+    const lineCount = content.split("\n").length;
+    if (parsed.startLine < 1 || parsed.endLine > lineCount || parsed.startLine > parsed.endLine) {
+      errors.push(`evidenceRef line range invalid: L${parsed.startLine}-L${parsed.endLine} (file has ${lineCount} lines) in ${ref}`);
+    }
+  }
+
+  return errors;
+}
+
 function validateBehaviorReviewForbiddenFields(output: any): string[] {
   const errors: string[] = [];
   const forbiddenFields = ["blocker", "issue", "severity", "blocking", "approve", "mergeRecommendation", "requestChanges"];
@@ -264,7 +299,7 @@ function validateEvidenceRefs(output: ChangeMap, runDir: string): string[] {
   return errors;
 }
 
-function validateAdequacy(output: ChangeMap, changedFiles: Array<{ path: string }>, manifest: InputManifest, inputManifestHash: string): string[] {
+function validateAdequacy(output: ChangeMap, changedFiles: Array<{ path: string }>): string[] {
   const errors: string[] = [];
 
   // Rule 1: changedModules must not be empty when there are changes
@@ -298,18 +333,6 @@ function validateAdequacy(output: ChangeMap, changedFiles: Array<{ path: string 
       (output.uncoveredContext ?? []).length > 0;
     if (!hasExplanation) {
       errors.push("All analysis arrays are empty but no explanation in assumptions or uncoveredContext");
-    }
-  }
-
-  // Rule 3: sourceArtifacts hash validation (required)
-  if (!output.sourceArtifacts) {
-    errors.push("sourceArtifacts is required");
-  } else {
-    if (output.sourceArtifacts.inputManifestHash !== inputManifestHash) {
-      errors.push("sourceArtifacts.inputManifestHash mismatch");
-    }
-    if (output.sourceArtifacts.policySnapshotHash !== manifest.policySnapshotHash) {
-      errors.push("sourceArtifacts.policySnapshotHash mismatch");
     }
   }
 
@@ -434,7 +457,7 @@ async function runChangeMapStage(ctx: {
   }
 
   const changedFiles = JSON.parse(changedFilesContent) as Array<{ path: string }>;
-  const adequacyErrors = validateAdequacy(changeMap, changedFiles, manifest, inputManifestHash);
+  const adequacyErrors = validateAdequacy(changeMap, changedFiles);
   if (adequacyErrors.length > 0) {
     throw new StageError(`Adequacy gate failed: ${adequacyErrors.join(", ")}`);
   }
@@ -615,27 +638,10 @@ async function runTestReviewStage(ctx: {
     testReview.verificationAssessment.testCommandStatus = "unavailable";
   }
 
-  // Validate source evidence refs
-  const allRefs = [
-    ...testReview.reviewedBehaviors.flatMap((rb) => [...(rb.implementationEvidenceRefs ?? []), ...(rb.testEvidenceRefs ?? [])]),
-    ...testReview.findings.flatMap((f) => f.evidenceRefs ?? []),
-  ];
-  for (const ref of allRefs) {
-    const parsed = parseSourceEvidenceRef(ref);
-    if (!parsed) {
-      throw new StageError(`Invalid evidenceRef format: ${ref}`);
-    }
-    if (parsed.commit !== gitState.headCommit) {
-      throw new StageError(`evidenceRef commit mismatch: expected ${gitState.headCommit}, got ${parsed.commit} in ${ref}`);
-    }
-    if (!fileExistsAtCommit(parsed.commit, parsed.path)) {
-      throw new StageError(`evidenceRef path not found at commit: ${parsed.path} in ${ref}`);
-    }
-    const content = getFileContentAtCommit(parsed.commit, parsed.path);
-    const lineCount = content.split("\n").length;
-    if (parsed.startLine < 1 || parsed.endLine > lineCount || parsed.startLine > parsed.endLine) {
-      throw new StageError(`evidenceRef line range invalid: L${parsed.startLine}-L${parsed.endLine} (file has ${lineCount} lines) in ${ref}`);
-    }
+  // Validate source evidence refs (reuse shared validation)
+  const testReviewRefErrors = validateTestReviewEvidenceRefs(testReview, gitState.headCommit);
+  if (testReviewRefErrors.length > 0) {
+    throw new StageError(`Invalid evidenceRefs: ${testReviewRefErrors.join(", ")}`);
   }
 
   // Validate test review structure
@@ -746,14 +752,19 @@ const TEST_REVIEW_SCHEMA = {
   required: ["reviewedBehaviors", "findings", "verificationAssessment", "uncoveredContext", "assumptions"],
 };
 
+const MAX_SOURCE_LINES_PER_FILE = 200;
+
 function buildSourceContext(changedFiles: Array<{ path: string }>, headCommit: string): string {
   const sections: string[] = [];
   for (const file of changedFiles) {
     try {
       const content = getFileContentAtCommit(headCommit, file.path);
       const lines = content.split("\n");
-      const numbered = lines.map((line, i) => `${i + 1}: ${line}`).join("\n");
-      sections.push(`\n--- SOURCE: git:${headCommit}:${file.path} ---\n${numbered}\n--- END SOURCE ---`);
+      const truncated = lines.length > MAX_SOURCE_LINES_PER_FILE;
+      const displayLines = truncated ? lines.slice(0, MAX_SOURCE_LINES_PER_FILE) : lines;
+      const numbered = displayLines.map((line, i) => `${i + 1}: ${line}`).join("\n");
+      const truncationNote = truncated ? `\n[... truncated: showing ${MAX_SOURCE_LINES_PER_FILE} of ${lines.length} lines]` : "";
+      sections.push(`\n--- SOURCE: git:${headCommit}:${file.path} ---\n${numbered}${truncationNote}\n--- END SOURCE ---`);
     } catch {
       // File might not exist at commit (e.g., deleted files)
       sections.push(`\n--- SOURCE: git:${headCommit}:${file.path} ---\n[File not available at this commit]\n--- END SOURCE ---`);
@@ -860,7 +871,6 @@ const CHANGE_MAP_SCHEMA = {
     reviewPriorities: { type: "array" },
     uncoveredContext: { type: "array" },
     assumptions: { type: "array" },
-    sourceArtifacts: { type: "object" },
   },
-  required: ["changedModules", "behaviorChanges", "riskAreas", "reviewPriorities", "uncoveredContext", "assumptions", "sourceArtifacts"],
+  required: ["changedModules", "behaviorChanges", "riskAreas", "reviewPriorities", "uncoveredContext", "assumptions"],
 };

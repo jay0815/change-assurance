@@ -271,8 +271,9 @@ describe("reviewStage", () => {
     expect(result.stageArtifactPath).toContain("change-map.json");
   });
 
-  it("should reject sourceArtifacts with wrong inputManifestHash", async () => {
-    const { runId } = createRunFixture();
+  it("should compute sourceArtifacts correctly in artifact output", async () => {
+    const { runId, inputManifestHash } = createRunFixture();
+    const policySnapshotHash = sha256(stringify({ version: 1 }));
     const adapterOutput = {
       changedModules: [{ path: "src/index.ts", role: "entry", changeSummary: "modified" }],
       behaviorChanges: [],
@@ -280,50 +281,15 @@ describe("reviewStage", () => {
       reviewPriorities: [],
       uncoveredContext: [],
       assumptions: ["test"],
-      sourceArtifacts: {
-        inputManifestHash: "wrong-manifest-hash",
-        policySnapshotHash: sha256(stringify({ version: 1 })),
-      },
+      // LLM omits sourceArtifacts — harness computes it
     };
 
     const adapter = createFakeAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "change-map", adapter }),
-    ).rejects.toThrow(StageError);
-  });
+    const result = await reviewStage({ runId, stage: "change-map", adapter });
 
-  it("should reject sourceArtifacts with wrong policySnapshotHash", async () => {
-    const { runId } = createRunFixture();
-    // Compute correct inputManifestHash
-    const policy = stringify({ version: 1 });
-    const changedFiles = [{ path: "src/index.ts", status: "modified", additions: 10, deletions: 5 }];
-    const gitState = { baseRef: "main", headRef: "HEAD", baseCommit: "base123", headCommit: "abc123", branch: "main", isDirty: false, timestamp: "2024-01-01T00:00:00.000Z" };
-    const manifest = {
-      runId, baseRef: "main", headRef: "HEAD", createdAt: "2024-01-01T00:00:00.000Z",
-      policySnapshotHash: sha256(policy),
-      diffHash: sha256("diff content"),
-      changedFilesHash: sha256(JSON.stringify(changedFiles, null, 2)),
-      gitStateHash: sha256(JSON.stringify(gitState, null, 2)),
-    };
-    const correctInputManifestHash = sha256(JSON.stringify(manifest, null, 2));
-
-    const adapterOutput = {
-      changedModules: [{ path: "src/index.ts", role: "entry", changeSummary: "modified" }],
-      behaviorChanges: [],
-      riskAreas: [],
-      reviewPriorities: [],
-      uncoveredContext: [],
-      assumptions: ["test"],
-      sourceArtifacts: {
-        inputManifestHash: correctInputManifestHash,
-        policySnapshotHash: "wrong-policy-hash",
-      },
-    };
-
-    const adapter = createFakeAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "change-map", adapter }),
-    ).rejects.toThrow(StageError);
+    const content = JSON.parse(readFileSync(result.stageArtifactPath, "utf-8"));
+    expect(content.sourceArtifacts.inputManifestHash).toBe(inputManifestHash);
+    expect(content.sourceArtifacts.policySnapshotHash).toBe(policySnapshotHash);
   });
 
   it("should reject changedModules with empty role or changeSummary", async () => {
