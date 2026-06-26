@@ -7,6 +7,7 @@ import { reviewStage, StageError } from "./review-stage.js";
 import { generateLedgers, LedgerError } from "./review-ledger.js";
 import { reviewValidate, ValidateError } from "./review-validate.js";
 import { reviewReport, ReportError } from "./review-report.js";
+import { reviewRun, RunError } from "./review-run.js";
 import { ClaudeAdapter, AdapterError } from "@change-assurance/adapter-claude";
 import { GitError, getValidationResultPath } from "@change-assurance/core";
 
@@ -21,6 +22,7 @@ Commands:
   review ledger     Generate issue and coverage ledgers
   review validate   Validate artifact chain integrity
   review report     Generate review report
+  review run        Run complete review pipeline
 
 Options:
   --help            Show this help message
@@ -37,6 +39,9 @@ Stage:
   ca review stage --run <run-id> --stage test-review --engine claude
   ca review stage --run <run-id> --stage evidence-audit --engine claude
   ca review stage --run <run-id> --stage synthesis --engine claude
+
+Run:
+  ca review run --base <ref> --head <ref> --engine claude --dry-run
 `);
 }
 
@@ -368,6 +373,71 @@ if (command === "review") {
       }
       process.exit(1);
     }
+  } else if (subcommand === "run") {
+    const runArgs = args.slice(2);
+    if (runArgs.includes("--help")) {
+      printRunUsage();
+      process.exit(0);
+    }
+
+    let base: string | undefined;
+    let head: string | undefined;
+    let engine: string | undefined;
+    let dryRun = false;
+    for (let i = 0; i < runArgs.length; i++) {
+      if (runArgs[i] === "--base" && runArgs[i + 1]) {
+        base = runArgs[++i];
+      } else if (runArgs[i] === "--head" && runArgs[i + 1]) {
+        head = runArgs[++i];
+      } else if (runArgs[i] === "--engine" && runArgs[i + 1]) {
+        engine = runArgs[++i];
+      } else if (runArgs[i] === "--dry-run") {
+        dryRun = true;
+      }
+    }
+
+    if (!engine) {
+      console.error("Error: --engine is required");
+      printRunUsage();
+      process.exit(1);
+    }
+
+    if (!dryRun) {
+      console.error("Error: --dry-run is required");
+      printRunUsage();
+      process.exit(1);
+    }
+
+    try {
+      const adapter = new ClaudeAdapter();
+      const result = await reviewRun({
+        base,
+        head,
+        engine: engine as "claude",
+        dryRun,
+        adapter,
+      });
+
+      if (result.status === "completed") {
+        console.log(`Review completed: ${result.runId}`);
+        console.log(`Decision: ${result.finalDecision ?? "unknown"}`);
+        console.log(`Report: ${result.reportPath ?? "N/A"}`);
+      } else {
+        console.error(`Review did not complete: ${result.runId}`);
+        console.error(`Status: ${result.status}`);
+        console.error(`Run summary: ${result.summaryPath}`);
+        process.exit(1);
+      }
+    } catch (error) {
+      if (error instanceof RunError || error instanceof AdapterError) {
+        console.error(`Error: ${error.message}`);
+      } else if (error instanceof Error) {
+        console.error("Unexpected error:", error.message);
+      } else {
+        console.error("Unexpected error:", error);
+      }
+      process.exit(1);
+    }
   } else {
     console.error(`Unknown subcommand: ${subcommand}`);
     printUsage();
@@ -435,5 +505,21 @@ Options:
 
 Example:
   ca review report --run abc123
+`);
+}
+
+function printRunUsage(): void {
+  console.log(`
+Usage: ca review run --base <ref> --head <ref> --engine claude --dry-run
+
+Options:
+  --base <ref>    Base git reference (e.g., origin/main)
+  --head <ref>    Head git reference (e.g., HEAD)
+  --engine <engine>  Engine to use (currently only claude)
+  --dry-run       Run in dry-run mode (required)
+  --help          Show this help message
+
+Example:
+  ca review run --base origin/main --head HEAD --engine claude --dry-run
 `);
 }

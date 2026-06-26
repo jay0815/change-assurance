@@ -86,3 +86,11 @@ export function getReportMarkdownPath(runId: string): string {
 export function getReportJsonPath(runId: string): string {
   return `${getReportDir(runId)}/review-report.json`;
 }
+
+export function getExecutionDir(runId: string): string {
+  return `${getRunDir(runId)}/execution`;
+}
+
+export function getRunSummaryPath(runId: string): string {
+  return `${getExecutionDir(runId)}/run-summary.json`;
+}
