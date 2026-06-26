@@ -1,0 +1,26 @@
+packages/cli/src/review-stage.ts
+  9e02ae5a5077f0f6 130-164,641-644,755-756,763-767
+packages/cli/src/__tests__/review-stage.test.ts
+  9e02ae5a5077f0f6 274-276,284,288,290-292
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "f926a8caf933050b4484805f13722446efeac024",
+  "prompts": {
+    "9e02ae5a5077f0f6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fa549a32-aae7-4dd1-ad43-1f15d4d9921b",
+        "model": "mimo-v2.5-pro"
+      },
+      "human_author": "guanchengqian",
+      "messages": [],
+      "total_additions": 58,
+      "total_deletions": 82,
+      "accepted_lines": 55,
+      "overriden_lines": 0,
+      "messages_url": "http://10.1.138.136:9188/cas/a0aab164bd10b5421ee81caf7ebe808fa2df131dec4c8d537949c9950379d36f"
+    }
+  }
+}
