@@ -95,7 +95,7 @@ export interface VerificationLedger {
 }
 
 // Stage types
-export type ReviewStage = "change-map" | "behavior-review" | "test-review";
+export type ReviewStage = "change-map" | "behavior-review" | "test-review" | "evidence-audit";
 
 export interface ChangedModule {
   path: string;
@@ -216,5 +216,42 @@ export interface TestReview {
     note: string;
   };
   uncoveredContext: UncoveredContext[];
+  assumptions: string[];
+}
+
+export type EvidenceClass = "observed" | "derived" | "hypothesis";
+export type AuditDisposition = "accepted" | "downgraded" | "needs_context" | "rejected";
+
+export interface AuditedFinding {
+  sourceFindingRef: string;
+  sourceStage: "behavior-review" | "test-review";
+  disposition: AuditDisposition;
+  evidenceClass: EvidenceClass;
+  effectiveCandidateImpact: "merge_blocking" | "material" | "advisory" | "needs_context" | null;
+  rationale: string;
+  verifiedEvidenceRefs: string[];
+  missingEvidence: string[];
+  missingContext: string[];
+  deduplicatedWith?: string;
+}
+
+export interface EvidenceAudit {
+  runId: string;
+  stage: "evidence-audit";
+  createdAt: string;
+  sourceArtifacts: {
+    inputManifestHash: string;
+    changeMapHash: string;
+    behaviorReviewHash: string;
+    testReviewHash: string;
+    verificationLedgerHash?: string;
+  };
+  auditedFindings: AuditedFinding[];
+  summary: {
+    accepted: number;
+    downgraded: number;
+    needsContext: number;
+    rejected: number;
+  };
   assumptions: string[];
 }

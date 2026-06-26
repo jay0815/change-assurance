@@ -17,6 +17,7 @@ import type {
   ChangeMap,
   BehaviorReview,
   TestReview,
+  EvidenceAudit,
   ReviewStage,
 } from "@change-assurance/core";
 
@@ -415,6 +416,13 @@ export async function reviewStage(options: StageOptions): Promise<{ stageArtifac
     });
   }
 
+  if (stage === "evidence-audit") {
+    return runEvidenceAuditStage({
+      runId, runDir, cwd, adapter, manifest, diffContent, changedFilesContent,
+      gitState, verificationLedgerHash, stagesDir, inputManifestHash,
+    });
+  }
+
   throw new StageError(`Unsupported stage: ${stage}`);
 }
 
@@ -669,6 +677,304 @@ async function runTestReviewStage(ctx: {
     verificationAssessment: testReview.verificationAssessment,
     uncoveredContext: testReview.uncoveredContext,
     assumptions: testReview.assumptions,
+  };
+
+  const artifactPath = resolve(cwd, getStageArtifactPath(runId, stage));
+  writeFileSync(artifactPath, JSON.stringify(artifact, null, 2));
+  return { stageArtifactPath: artifactPath };
+}
+
+// Evidence Audit stage
+
+const IMPACT_RANK: Record<string, number> = {
+  merge_blocking: 4,
+  material: 3,
+  advisory: 2,
+  needs_context: 1,
+};
+
+function validateEvidenceAuditForbiddenFields(output: any): string[] {
+  const errors: string[] = [];
+  const forbiddenFields = ["blocker", "issue", "severity", "blocking", "approve", "mergeRecommendation", "requestChanges"];
+  for (const field of forbiddenFields) {
+    if (field in output) {
+      errors.push(`Forbidden field: ${field}`);
+    }
+  }
+  return errors;
+}
+
+function validateEvidenceAudit(
+  output: EvidenceAudit,
+  behaviorReview: BehaviorReview,
+  testReview: TestReview,
+): string[] {
+  const errors: string[] = [];
+
+  // Build valid finding refs
+  const validBrRefs = new Set(behaviorReview.findings.map((f) => f.id));
+  const validTrRefs = new Set(testReview.findings.map((f) => f.id));
+  const allFindingRefs = new Set([...validBrRefs, ...validTrRefs]);
+
+  // Build evidence ref lookup: findingId → Set<evidenceRef>
+  const brEvidenceMap = new Map<string, Set<string>>();
+  for (const f of behaviorReview.findings) {
+    brEvidenceMap.set(f.id, new Set(f.evidenceRefs ?? []));
+  }
+  const trEvidenceMap = new Map<string, Set<string>>();
+  for (const f of testReview.findings) {
+    trEvidenceMap.set(f.id, new Set(f.evidenceRefs ?? []));
+  }
+
+  // Build source finding impact lookup
+  const brImpactMap = new Map<string, string>();
+  for (const f of behaviorReview.findings) {
+    brImpactMap.set(f.id, f.candidateImpact);
+  }
+  const trImpactMap = new Map<string, string>();
+  for (const f of testReview.findings) {
+    trImpactMap.set(f.id, f.candidateImpact);
+  }
+
+  for (let i = 0; i < output.auditedFindings.length; i++) {
+    const af = output.auditedFindings[i];
+
+    // Validate sourceFindingRef exists
+    if (!allFindingRefs.has(af.sourceFindingRef)) {
+      errors.push(`sourceFindingRef not found: ${af.sourceFindingRef}`);
+      continue;
+    }
+
+    // Validate verifiedEvidenceRefs are subset of source finding's evidenceRefs
+    const sourceEvidence = af.sourceStage === "behavior-review"
+      ? brEvidenceMap.get(af.sourceFindingRef) ?? new Set<string>()
+      : trEvidenceMap.get(af.sourceFindingRef) ?? new Set<string>();
+
+    for (const ref of af.verifiedEvidenceRefs) {
+      if (!sourceEvidence.has(ref)) {
+        errors.push(`verifiedEvidenceRef ${ref} not in source finding ${af.sourceFindingRef}`);
+      }
+    }
+
+    // hypothesis must not be merge_blocking
+    if (af.evidenceClass === "hypothesis" && af.effectiveCandidateImpact === "merge_blocking") {
+      errors.push(`hypothesis finding ${af.sourceFindingRef} cannot be merge_blocking`);
+    }
+
+    // effectiveCandidateImpact must not exceed source finding's candidateImpact
+    const sourceImpact = af.sourceStage === "behavior-review"
+      ? brImpactMap.get(af.sourceFindingRef)
+      : trImpactMap.get(af.sourceFindingRef);
+
+    if (sourceImpact && af.effectiveCandidateImpact && af.effectiveCandidateImpact !== "needs_context") {
+      const sourceRank = IMPACT_RANK[sourceImpact] ?? 0;
+      const auditRank = IMPACT_RANK[af.effectiveCandidateImpact] ?? 0;
+      if (auditRank > sourceRank) {
+        errors.push(`cannot upgrade ${af.sourceFindingRef} from ${sourceImpact} to ${af.effectiveCandidateImpact}`);
+      }
+    }
+
+    // rejected must have null effectiveCandidateImpact
+    if (af.disposition === "rejected" && af.effectiveCandidateImpact !== null) {
+      errors.push(`rejected finding ${af.sourceFindingRef} must have null effectiveCandidateImpact`);
+    }
+
+    // deduplicatedWith must reference a valid audit finding
+    if (af.deduplicatedWith !== undefined) {
+      if (!allFindingRefs.has(af.deduplicatedWith)) {
+        errors.push(`deduplicatedWith references unknown finding: ${af.deduplicatedWith}`);
+      }
+    }
+  }
+
+  // Summary must match actual counts
+  const dispositionToKey: Record<string, keyof { accepted: number; downgraded: number; needsContext: number; rejected: number }> = {
+    accepted: "accepted",
+    downgraded: "downgraded",
+    needs_context: "needsContext",
+    rejected: "rejected",
+  };
+  const counts = { accepted: 0, downgraded: 0, needsContext: 0, rejected: 0 };
+  for (const af of output.auditedFindings) {
+    const key = dispositionToKey[af.disposition];
+    if (key) {
+      counts[key]++;
+    }
+  }
+  if (counts.accepted !== output.summary.accepted) {
+    errors.push(`summary.accepted mismatch: expected ${counts.accepted}, got ${output.summary.accepted}`);
+  }
+  if (counts.downgraded !== output.summary.downgraded) {
+    errors.push(`summary.downgraded mismatch: expected ${counts.downgraded}, got ${output.summary.downgraded}`);
+  }
+  if (counts.needsContext !== output.summary.needsContext) {
+    errors.push(`summary.needsContext mismatch: expected ${counts.needsContext}, got ${output.summary.needsContext}`);
+  }
+
+  if (counts.rejected !== output.summary.rejected) {
+    errors.push(`summary.rejected mismatch: expected ${counts.rejected}, got ${output.summary.rejected}`);
+  }
+
+  return errors;
+}
+
+function buildEvidenceAuditPrompt(
+  behaviorReviewJson: string,
+  testReviewJson: string,
+  headCommit: string,
+): string {
+  // Build per-finding evidence lists for the prompt
+  const brFindingsList = JSON.parse(behaviorReviewJson).findings.map((f: any) =>
+    `  - [${f.id}] ${f.title} (impact: ${f.candidateImpact}, confidence: ${f.confidence})\n    evidenceRefs: ${(f.evidenceRefs ?? []).join(", ")}`,
+  ).join("\n");
+  const trFindingsList = JSON.parse(testReviewJson).findings.map((f: any) =>
+    `  - [${f.id}] ${f.title} (impact: ${f.candidateImpact}, confidence: ${f.confidence})\n    evidenceRefs: ${(f.evidenceRefs ?? []).join(", ")}`,
+  ).join("\n");
+
+  return `You are performing an evidence audit for a code review.
+
+TASK: Evaluate whether each candidate finding from previous stages has sufficient evidence. Classify evidence and determine disposition.
+
+CONSTRAINTS:
+1. You are NOT a new reviewer. Do NOT add new findings or issues.
+2. You can ONLY evaluate whether existing findings have sufficient evidence.
+3. Classify each finding as observed / derived / hypothesis.
+4. When evidence is insufficient, prefer needs_context. Do NOT speculate.
+5. You MUST NOT upgrade any finding's candidateImpact level.
+6. Do NOT output blockers, merge recommendations, or request-changes.
+7. For duplicate findings, specify the primary finding via deduplicatedWith.
+8. CRITICAL: verifiedEvidenceRefs MUST be a SUBSET of the finding's evidenceRefs listed below. Do NOT invent new evidence refs.
+
+EVIDENCE CLASSIFICATION:
+- observed: conclusion directly proven by code, diff, test output, or verification record
+- derived: conclusion deduced from multiple verified facts; must preserve derivation chain
+- hypothesis: reasonable concern but insufficient evidence to prove real impact
+
+DISPOSITION RULES:
+- accepted: evidence is sufficient, finding stands at its current or lower impact level
+- downgraded: evidence supports the concern but at a lower impact level
+- needs_context: risk is reasonable but missing business, interface, or runtime context
+- rejected: evidence is invalid, duplicate, irreproducible, or outside scope
+
+IMPACT LEVELS (cannot upgrade):
+- merge_blocking > material > advisory > needs_context
+
+BEHAVIOR-REVIEW FINDINGS:
+${brFindingsList}
+
+TEST-REVIEW FINDINGS:
+${trFindingsList}
+
+OUTPUT FORMAT (JSON):
+{
+  "auditedFindings": [{
+    "sourceFindingRef": "B001 or T001",
+    "sourceStage": "behavior-review|test-review",
+    "disposition": "accepted|downgraded|needs_context|rejected",
+    "evidenceClass": "observed|derived|hypothesis",
+    "effectiveCandidateImpact": "merge_blocking|material|advisory|needs_context|null",
+    "rationale": "...",
+    "verifiedEvidenceRefs": ["ONLY refs from the finding's evidenceRefs listed above"],
+    "missingEvidence": ["..."],
+    "missingContext": ["..."],
+    "deduplicatedWith": "optional: B001 or T001"
+  }],
+  "summary": {
+    "accepted": 0,
+    "downgraded": 0,
+    "needsContext": 0,
+    "rejected": 0
+  },
+  "assumptions": ["..."]
+}`;
+}
+
+const EVIDENCE_AUDIT_SCHEMA = {
+  type: "object",
+  properties: {
+    auditedFindings: { type: "array" },
+    summary: { type: "object" },
+    assumptions: { type: "array" },
+  },
+  required: ["auditedFindings", "summary", "assumptions"],
+};
+
+async function runEvidenceAuditStage(ctx: {
+  runId: string; runDir: string; cwd: string; adapter: ReviewStageAdapter;
+  manifest: InputManifest; diffContent: string; changedFilesContent: string;
+  gitState: { headCommit: string }; verificationLedgerHash?: string; stagesDir: string;
+  inputManifestHash: string;
+}): Promise<{ stageArtifactPath: string }> {
+  const { runId, cwd, adapter, gitState, verificationLedgerHash, stagesDir, inputManifestHash } = ctx;
+  const stage = "evidence-audit";
+
+  // Prerequisites: all three prior stage artifacts must exist
+  const changeMapPath = resolve(stagesDir, "change-map.json");
+  if (!existsSync(changeMapPath)) {
+    throw new StageError("change-map.json not found. Run change-map stage first.");
+  }
+  const behaviorReviewPath = resolve(stagesDir, "behavior-review.json");
+  if (!existsSync(behaviorReviewPath)) {
+    throw new StageError("behavior-review.json not found. Run behavior-review stage first.");
+  }
+  const testReviewPath = resolve(stagesDir, "test-review.json");
+  if (!existsSync(testReviewPath)) {
+    throw new StageError("test-review.json not found. Run test-review stage first.");
+  }
+
+  const changeMapContent = readFileSync(changeMapPath, "utf-8");
+  const changeMapHash = sha256(changeMapContent);
+  const behaviorReviewContent = readFileSync(behaviorReviewPath, "utf-8");
+  const behaviorReviewHash = sha256(behaviorReviewContent);
+  const testReviewContent = readFileSync(testReviewPath, "utf-8");
+  const testReviewHash = sha256(testReviewContent);
+
+  const behaviorReview = JSON.parse(behaviorReviewContent) as BehaviorReview;
+  const testReview = JSON.parse(testReviewContent) as TestReview;
+
+  const prompt = buildEvidenceAuditPrompt(behaviorReviewContent, testReviewContent, gitState.headCommit);
+
+  let rawMessages: unknown;
+  let structuredOutput: unknown;
+  try {
+    const result = await adapter.runStage({ stage, runDirectory: cwd, prompt, schema: EVIDENCE_AUDIT_SCHEMA });
+    rawMessages = result.rawOutput;
+    structuredOutput = result.structuredOutput;
+  } catch (error) {
+    const rawPath = resolve(cwd, getStageRawArtifactPath(runId, stage));
+    writeFileSync(rawPath, JSON.stringify({ error: String(error) }, null, 2));
+    throw error;
+  }
+
+  const rawPath = resolve(cwd, getStageRawArtifactPath(runId, stage));
+  writeFileSync(rawPath, JSON.stringify(rawMessages, null, 2));
+
+  // Validate forbidden fields
+  const forbiddenErrors = validateEvidenceAuditForbiddenFields(structuredOutput);
+  if (forbiddenErrors.length > 0) {
+    throw new StageError(`Invalid output: ${forbiddenErrors.join(", ")}`);
+  }
+
+  const evidenceAudit = structuredOutput as EvidenceAudit;
+
+  // Validate audit rules
+  const auditErrors = validateEvidenceAudit(evidenceAudit, behaviorReview, testReview);
+  if (auditErrors.length > 0) {
+    throw new StageError(`Invalid evidence audit: ${auditErrors.join(", ")}`);
+  }
+
+  const artifact: EvidenceAudit = {
+    runId, stage: "evidence-audit", createdAt: new Date().toISOString(),
+    sourceArtifacts: {
+      inputManifestHash,
+      changeMapHash,
+      behaviorReviewHash,
+      testReviewHash,
+      verificationLedgerHash,
+    },
+    auditedFindings: evidenceAudit.auditedFindings,
+    summary: evidenceAudit.summary,
+    assumptions: evidenceAudit.assumptions,
   };
 
   const artifactPath = resolve(cwd, getStageArtifactPath(runId, stage));

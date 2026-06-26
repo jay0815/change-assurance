@@ -28,6 +28,7 @@ Stage:
   ca review stage --run <run-id> --stage change-map --engine claude
   ca review stage --run <run-id> --stage behavior-review --engine claude
   ca review stage --run <run-id> --stage test-review --engine claude
+  ca review stage --run <run-id> --stage evidence-audit --engine claude
 `);
 }
 
@@ -201,8 +202,8 @@ if (command === "review") {
       process.exit(1);
     }
 
-    if (stage !== "change-map" && stage !== "behavior-review" && stage !== "test-review") {
-      console.error(`Error: Unsupported stage: ${stage}. Supported: change-map, behavior-review, test-review.`);
+    if (stage !== "change-map" && stage !== "behavior-review" && stage !== "test-review" && stage !== "evidence-audit") {
+      console.error(`Error: Unsupported stage: ${stage}. Supported: change-map, behavior-review, test-review, evidence-audit.`);
       process.exit(1);
     }
 
@@ -249,7 +250,7 @@ Usage: ca review stage --run <run-id> --stage <stage> --engine <engine>
 
 Options:
   --run <run-id>      Run ID from prepare step
-  --stage <stage>     Stage to run (change-map, behavior-review, test-review)
+  --stage <stage>     Stage to run (change-map, behavior-review, test-review, evidence-audit)
   --engine <engine>   Engine to use (currently only claude)
   --help              Show this help message
 
@@ -257,5 +258,6 @@ Example:
   ca review stage --run abc123 --stage change-map --engine claude
   ca review stage --run abc123 --stage behavior-review --engine claude
   ca review stage --run abc123 --stage test-review --engine claude
+  ca review stage --run abc123 --stage evidence-audit --engine claude
 `);
 }

@@ -904,3 +904,324 @@ describe("test-review stage", () => {
     expect(content.verificationAssessment.testCommandStatus).toBe("unavailable");
   });
 });
+
+describe("evidence-audit stage", () => {
+  let tempDir: string;
+  let originalCwd: string;
+  let mockGetHeadCommit: ReturnType<typeof vi.fn>;
+  let mockIsWorkingTreeDirty: ReturnType<typeof vi.fn>;
+  let mockGetFileContentAtCommit: ReturnType<typeof vi.fn>;
+  let mockFileExistsAtCommit: ReturnType<typeof vi.fn>;
+
+  beforeEach(async () => {
+    originalCwd = process.cwd();
+    tempDir = mkdtempSync(join(tmpdir(), "change-assurance-evidence-audit-test-"));
+    process.chdir(tempDir);
+
+    mockGetHeadCommit = vi.mocked(core.getHeadCommit);
+    mockIsWorkingTreeDirty = vi.mocked(core.isWorkingTreeDirty);
+    mockGetFileContentAtCommit = vi.mocked(core.getFileContentAtCommit);
+    mockFileExistsAtCommit = vi.mocked(core.fileExistsAtCommit);
+    mockGetHeadCommit.mockReset();
+    mockIsWorkingTreeDirty.mockReset();
+    mockGetFileContentAtCommit.mockReset();
+    mockFileExistsAtCommit.mockReset();
+  });
+
+  afterEach(() => {
+    process.chdir(originalCwd);
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  function createEvidenceAuditFixture(opts?: { behaviorReviewFindings?: any[]; testReviewFindings?: any[] }) {
+    const runId = "test-evidence-audit";
+    const headCommit = "abc123def456";
+    const policy = { version: 1 };
+    const changedFiles = [{ path: "src/index.ts", status: "modified", additions: 10, deletions: 5 }];
+    const gitState = {
+      baseRef: "main", headRef: "HEAD", baseCommit: "base123", headCommit,
+      branch: "main", isDirty: false, timestamp: "2024-01-01T00:00:00.000Z",
+    };
+
+    const policySnapshot = stringify(policy);
+    const changedFilesJson = JSON.stringify(changedFiles, null, 2);
+    const gitStateJson = JSON.stringify(gitState, null, 2);
+
+    const manifest = {
+      runId, baseRef: "main", headRef: "HEAD", createdAt: "2024-01-01T00:00:00.000Z",
+      policySnapshotHash: sha256(policySnapshot),
+      diffHash: sha256("diff content"),
+      changedFilesHash: sha256(changedFilesJson),
+      gitStateHash: sha256(gitStateJson),
+    };
+
+    const inputDir = join(tempDir, ".change-assurance", "runs", runId, "input");
+    const stagesDir = join(tempDir, ".change-assurance", "runs", runId, "stages");
+    mkdirSync(inputDir, { recursive: true });
+    mkdirSync(stagesDir, { recursive: true });
+
+    writeFileSync(join(inputDir, "input-manifest.json"), JSON.stringify(manifest, null, 2));
+    writeFileSync(join(inputDir, "diff.patch"), "diff content");
+    writeFileSync(join(inputDir, "changed-files.json"), changedFilesJson);
+    writeFileSync(join(inputDir, "git-state.json"), gitStateJson);
+    writeFileSync(join(inputDir, "policy.snapshot.yaml"), policySnapshot);
+
+    const changeMap = {
+      runId, stage: "change-map", createdAt: "2024-01-01T00:00:00.000Z",
+      sourceArtifacts: { inputManifestHash: sha256(policySnapshot), policySnapshotHash: sha256(policySnapshot) },
+      changedModules: [{ path: "src/index.ts", role: "entry", changeSummary: "modified" }],
+      behaviorChanges: [], riskAreas: [], reviewPriorities: [],
+      uncoveredContext: [], assumptions: [],
+    };
+    writeFileSync(join(stagesDir, "change-map.json"), JSON.stringify(changeMap, null, 2));
+
+    const brFindings = opts?.behaviorReviewFindings ?? [{
+      id: "B001", title: "Missing null check", type: "failure_path", candidateImpact: "material",
+      trigger: "null input", observedBehavior: "throws", impact: "crash", recommendation: "add check",
+      evidenceRefs: [`git:${headCommit}:src/index.ts#L3-L5`], confidence: "high",
+    }];
+    const behaviorReview = {
+      runId, stage: "behavior-review", createdAt: "2024-01-01T00:00:00.000Z",
+      sourceArtifacts: { inputManifestHash: sha256(policySnapshot), changeMapHash: sha256(JSON.stringify(changeMap)) },
+      reviewedAreas: [{ area: "entry", paths: ["src/index.ts"], focus: "core", evidenceRefs: [`git:${headCommit}:src/index.ts#L1-L5`] }],
+      findings: brFindings, uncoveredContext: [], assumptions: [],
+    };
+    writeFileSync(join(stagesDir, "behavior-review.json"), JSON.stringify(behaviorReview, null, 2));
+
+    const trFindings = opts?.testReviewFindings ?? [{
+      id: "T001", title: "Missing test for null input", type: "missing_test", candidateImpact: "material",
+      behavior: "null input handling", observedTestCoverage: "none", impact: "untested", recommendation: "add test",
+      evidenceRefs: [`git:${headCommit}:src/index.ts#L3-L5`], confidence: "high",
+    }];
+    const testReview = {
+      runId, stage: "test-review", createdAt: "2024-01-01T00:00:00.000Z",
+      sourceArtifacts: {
+        inputManifestHash: sha256(policySnapshot), changeMapHash: sha256(JSON.stringify(changeMap)),
+        behaviorReviewHash: sha256(JSON.stringify(behaviorReview)),
+      },
+      reviewedBehaviors: [{
+        behavior: "null input handling", implementationEvidenceRefs: [`git:${headCommit}:src/index.ts#L3-L5`],
+        testEvidenceRefs: [], assessment: "not_covered", rationale: "no test",
+      }],
+      findings: trFindings,
+      verificationAssessment: { testCommandStatus: "unavailable", note: "no ledger" },
+      uncoveredContext: [], assumptions: [],
+    };
+    writeFileSync(join(stagesDir, "test-review.json"), JSON.stringify(testReview, null, 2));
+
+    mockGetHeadCommit.mockReturnValue(headCommit);
+    mockIsWorkingTreeDirty.mockReturnValue(false);
+    mockFileExistsAtCommit.mockReturnValue(true);
+    mockGetFileContentAtCommit.mockReturnValue(Array(20).fill("function foo() { return 1; }").join("\n"));
+
+    return { runId, headCommit };
+  }
+
+  function createEvidenceAuditAdapter(output: any) {
+    return {
+      detectCapabilities: () => ({ available: true, version: "2.1.153", supportsJsonOutput: true, supportsJsonSchema: true }),
+      runStage: vi.fn().mockResolvedValue({ rawOutput: output, structuredOutput: output }),
+    };
+  }
+
+  it("should accept observed finding with complete evidence", async () => {
+    const { runId, headCommit } = createEvidenceAuditFixture();
+    const ref = `git:${headCommit}:src/index.ts#L3-L5`;
+
+    const adapterOutput = {
+      auditedFindings: [{
+        sourceFindingRef: "B001", sourceStage: "behavior-review",
+        disposition: "accepted", evidenceClass: "observed",
+        effectiveCandidateImpact: "material",
+        rationale: "null check missing, verified in source",
+        verifiedEvidenceRefs: [ref], missingEvidence: [], missingContext: [],
+      }],
+      summary: { accepted: 1, downgraded: 0, needsContext: 0, rejected: 0 },
+      assumptions: [],
+    };
+
+    const adapter = createEvidenceAuditAdapter(adapterOutput);
+    const result = await reviewStage({ runId, stage: "evidence-audit", adapter });
+
+    const content = JSON.parse(readFileSync(result.stageArtifactPath, "utf-8"));
+    expect(content.stage).toBe("evidence-audit");
+    expect(content.auditedFindings).toHaveLength(1);
+    expect(content.auditedFindings[0].disposition).toBe("accepted");
+  });
+
+  it("should reject hypothesis finding marked as merge_blocking", async () => {
+    const { runId, headCommit } = createEvidenceAuditFixture();
+    const ref = `git:${headCommit}:src/index.ts#L3-L5`;
+
+    const adapterOutput = {
+      auditedFindings: [{
+        sourceFindingRef: "B001", sourceStage: "behavior-review",
+        disposition: "accepted", evidenceClass: "hypothesis",
+        effectiveCandidateImpact: "merge_blocking",
+        rationale: "might be a problem",
+        verifiedEvidenceRefs: [ref], missingEvidence: [], missingContext: [],
+      }],
+      summary: { accepted: 1, downgraded: 0, needsContext: 0, rejected: 0 },
+      assumptions: [],
+    };
+
+    const adapter = createEvidenceAuditAdapter(adapterOutput);
+    await expect(
+      reviewStage({ runId, stage: "evidence-audit", adapter }),
+    ).rejects.toThrow(StageError);
+  });
+
+  it("should reject audit that adds evidenceRef not in source finding", async () => {
+    const { runId } = createEvidenceAuditFixture();
+
+    const adapterOutput = {
+      auditedFindings: [{
+        sourceFindingRef: "B001", sourceStage: "behavior-review",
+        disposition: "accepted", evidenceClass: "observed",
+        effectiveCandidateImpact: "material",
+        rationale: "verified",
+        verifiedEvidenceRefs: ["git:abc123def456:src/nonexistent.ts#L1-L2"],
+        missingEvidence: [], missingContext: [],
+      }],
+      summary: { accepted: 1, downgraded: 0, needsContext: 0, rejected: 0 },
+      assumptions: [],
+    };
+
+    const adapter = createEvidenceAuditAdapter(adapterOutput);
+    await expect(
+      reviewStage({ runId, stage: "evidence-audit", adapter }),
+    ).rejects.toThrow(StageError);
+  });
+
+  it("should reject audit that upgrades material to merge_blocking", async () => {
+    const { runId, headCommit } = createEvidenceAuditFixture();
+    const ref = `git:${headCommit}:src/index.ts#L3-L5`;
+
+    const adapterOutput = {
+      auditedFindings: [{
+        sourceFindingRef: "B001", sourceStage: "behavior-review",
+        disposition: "accepted", evidenceClass: "observed",
+        effectiveCandidateImpact: "merge_blocking",
+        rationale: "critical",
+        verifiedEvidenceRefs: [ref], missingEvidence: [], missingContext: [],
+      }],
+      summary: { accepted: 1, downgraded: 0, needsContext: 0, rejected: 0 },
+      assumptions: [],
+    };
+
+    const adapter = createEvidenceAuditAdapter(adapterOutput);
+    await expect(
+      reviewStage({ runId, stage: "evidence-audit", adapter }),
+    ).rejects.toThrow(StageError);
+  });
+
+  it("should reject invalid sourceFindingRef", async () => {
+    const { runId } = createEvidenceAuditFixture();
+
+    const adapterOutput = {
+      auditedFindings: [{
+        sourceFindingRef: "NONEXISTENT", sourceStage: "behavior-review",
+        disposition: "accepted", evidenceClass: "observed",
+        effectiveCandidateImpact: "material",
+        rationale: "verified",
+        verifiedEvidenceRefs: [], missingEvidence: [], missingContext: [],
+      }],
+      summary: { accepted: 1, downgraded: 0, needsContext: 0, rejected: 0 },
+      assumptions: [],
+    };
+
+    const adapter = createEvidenceAuditAdapter(adapterOutput);
+    await expect(
+      reviewStage({ runId, stage: "evidence-audit", adapter }),
+    ).rejects.toThrow(StageError);
+  });
+
+  it("should reject deduplicatedWith pointing to nonexistent finding", async () => {
+    const { runId, headCommit } = createEvidenceAuditFixture();
+    const ref = `git:${headCommit}:src/index.ts#L3-L5`;
+
+    const adapterOutput = {
+      auditedFindings: [{
+        sourceFindingRef: "B001", sourceStage: "behavior-review",
+        disposition: "accepted", evidenceClass: "observed",
+        effectiveCandidateImpact: "material",
+        rationale: "verified",
+        verifiedEvidenceRefs: [ref], missingEvidence: [], missingContext: [],
+        deduplicatedWith: "FAKE_ID",
+      }],
+      summary: { accepted: 1, downgraded: 0, needsContext: 0, rejected: 0 },
+      assumptions: [],
+    };
+
+    const adapter = createEvidenceAuditAdapter(adapterOutput);
+    await expect(
+      reviewStage({ runId, stage: "evidence-audit", adapter }),
+    ).rejects.toThrow(StageError);
+  });
+
+  it("should reject rejected finding that still has impact", async () => {
+    const { runId } = createEvidenceAuditFixture();
+
+    const adapterOutput = {
+      auditedFindings: [{
+        sourceFindingRef: "B001", sourceStage: "behavior-review",
+        disposition: "rejected", evidenceClass: "hypothesis",
+        effectiveCandidateImpact: "material",
+        rationale: "insufficient evidence",
+        verifiedEvidenceRefs: [], missingEvidence: ["no proof"], missingContext: [],
+      }],
+      summary: { accepted: 0, downgraded: 0, needsContext: 0, rejected: 1 },
+      assumptions: [],
+    };
+
+    const adapter = createEvidenceAuditAdapter(adapterOutput);
+    await expect(
+      reviewStage({ runId, stage: "evidence-audit", adapter }),
+    ).rejects.toThrow(StageError);
+  });
+
+  it("should reject summary count mismatch", async () => {
+    const { runId, headCommit } = createEvidenceAuditFixture();
+    const ref = `git:${headCommit}:src/index.ts#L3-L5`;
+
+    const adapterOutput = {
+      auditedFindings: [{
+        sourceFindingRef: "B001", sourceStage: "behavior-review",
+        disposition: "accepted", evidenceClass: "observed",
+        effectiveCandidateImpact: "material",
+        rationale: "verified",
+        verifiedEvidenceRefs: [ref], missingEvidence: [], missingContext: [],
+      }],
+      summary: { accepted: 2, downgraded: 0, needsContext: 0, rejected: 0 },
+      assumptions: [],
+    };
+
+    const adapter = createEvidenceAuditAdapter(adapterOutput);
+    await expect(
+      reviewStage({ runId, stage: "evidence-audit", adapter }),
+    ).rejects.toThrow(StageError);
+  });
+
+  it("should reject output with merge recommendation or blocker field", async () => {
+    const { runId, headCommit } = createEvidenceAuditFixture();
+    const ref = `git:${headCommit}:src/index.ts#L3-L5`;
+
+    const adapterOutput = {
+      auditedFindings: [{
+        sourceFindingRef: "B001", sourceStage: "behavior-review",
+        disposition: "accepted", evidenceClass: "observed",
+        effectiveCandidateImpact: "material",
+        rationale: "verified",
+        verifiedEvidenceRefs: [ref], missingEvidence: [], missingContext: [],
+      }],
+      summary: { accepted: 1, downgraded: 0, needsContext: 0, rejected: 0 },
+      assumptions: [],
+      mergeRecommendation: "approve",
+    };
+
+    const adapter = createEvidenceAuditAdapter(adapterOutput);
+    await expect(
+      reviewStage({ runId, stage: "evidence-audit", adapter }),
+    ).rejects.toThrow(StageError);
+  });
+});
