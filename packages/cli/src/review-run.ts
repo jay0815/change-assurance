@@ -28,7 +28,7 @@ export interface ReviewRunResult {
   summaryPath: string;
 }
 
-const STAGE_ORDER = ["change-map", "behavior-review", "test-review", "evidence-audit", "synthesis"];
+const STAGE_ORDER = ["change-map", "behavior-review", "test-review", "evidence-audit"];
 
 export async function reviewRun(options: RunOptions): Promise<ReviewRunResult> {
   if (options.engine !== "claude") {
@@ -76,6 +76,17 @@ export async function reviewRun(options: RunOptions): Promise<ReviewRunResult> {
     // Generate ledgers
     try {
       generateLedgers({ runId });
+    } catch (error) {
+      return {
+        runId,
+        status: "failed",
+        summaryPath: "",
+      };
+    }
+
+    // Run synthesis (requires ledgers)
+    try {
+      await reviewStage({ runId, stage: "synthesis", adapter: options.adapter });
     } catch (error) {
       return {
         runId,
