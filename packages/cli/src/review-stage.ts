@@ -1149,6 +1149,7 @@ CONSTRAINTS:
 - Only analyze the provided diff and changed files
 - Do NOT output blockers, issues, or merge recommendations
 - All behavior changes must reference evidence from the diff
+- CRITICAL: evidenceRefs MUST use the exact value "input/diff.patch". Do NOT use file paths or line numbers.
 - If information is insufficient, add to uncoveredContext
 - Do NOT claim any verification commands were executed
 
