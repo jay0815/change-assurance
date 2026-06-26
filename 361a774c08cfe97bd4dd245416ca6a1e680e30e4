@@ -1,0 +1,34 @@
+packages/core/src/types.ts
+  9e02ae5a5077f0f6 258-326
+packages/cli/src/review-stage.ts
+  9e02ae5a5077f0f6 824
+packages/cli/src/index.ts
+  9e02ae5a5077f0f6 6,18,238-283,295-308
+packages/core/src/artifact.ts
+  9e02ae5a5077f0f6 57-68
+packages/cli/src/review-ledger.ts
+  9e02ae5a5077f0f6 1-379
+packages/cli/src/__tests__/review-ledger.test.ts
+  9e02ae5a5077f0f6 1-306
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "361a774c08cfe97bd4dd245416ca6a1e680e30e4",
+  "prompts": {
+    "9e02ae5a5077f0f6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fa549a32-aae7-4dd1-ad43-1f15d4d9921b",
+        "model": "mimo-v2.5-pro"
+      },
+      "human_author": "guanchengqian",
+      "messages": [],
+      "total_additions": 859,
+      "total_deletions": 31,
+      "accepted_lines": 829,
+      "overriden_lines": 0,
+      "messages_url": "http://10.1.138.136:9188/cas/43223639b1722c8ff2d88dca63620dcdfd5ea64af55cb3565a248017122db830"
+    }
+  }
+}
