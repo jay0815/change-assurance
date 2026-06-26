@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { reviewRun, RunError } from "../review-run.js";
+import { reviewRun } from "../review-run.js";
 
 vi.mock("../review-prepare.js", () => ({
   reviewPrepare: vi.fn(),

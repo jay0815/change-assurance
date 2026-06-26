@@ -1,0 +1,6 @@
+version: 1
+
+verification:
+  commands:
+    - id: check
+      argv: ["node", "scripts/check.mjs"]

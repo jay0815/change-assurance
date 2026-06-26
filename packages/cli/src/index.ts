@@ -8,6 +8,7 @@ import { generateLedgers, LedgerError } from "./review-ledger.js";
 import { reviewValidate, ValidateError } from "./review-validate.js";
 import { reviewReport, ReportError } from "./review-report.js";
 import { reviewRun, RunError } from "./review-run.js";
+import { evalRun, EvalError } from "./eval-run.js";
 import { ClaudeAdapter, AdapterError } from "@change-assurance/adapter-claude";
 import { GitError, getValidationResultPath } from "@change-assurance/core";
 
@@ -23,6 +24,7 @@ Commands:
   review validate   Validate artifact chain integrity
   review report     Generate review report
   review run        Run complete review pipeline
+  eval run          Run evaluation cases
 
 Options:
   --help            Show this help message
@@ -42,6 +44,10 @@ Stage:
 
 Run:
   ca review run --base <ref> --head <ref> --engine claude --dry-run
+
+Eval:
+  ca eval run --case <case-id> --engine claude
+  ca eval run --all --engine claude [--repeat <n>]
 `);
 }
 
@@ -443,6 +449,103 @@ if (command === "review") {
     printUsage();
     process.exit(1);
   }
+} else if (command === "eval") {
+  if (subcommand === "run") {
+    const evalArgs = args.slice(2);
+    if (evalArgs.includes("--help")) {
+      printEvalUsage();
+      process.exit(0);
+    }
+
+    let caseId: string | undefined;
+    let all = false;
+    let engine: string | undefined;
+    let repeat = 1;
+    for (let i = 0; i < evalArgs.length; i++) {
+      if (evalArgs[i] === "--case" && evalArgs[i + 1]) {
+        caseId = evalArgs[++i];
+      } else if (evalArgs[i] === "--all") {
+        all = true;
+      } else if (evalArgs[i] === "--engine" && evalArgs[i + 1]) {
+        engine = evalArgs[++i];
+      } else if (evalArgs[i] === "--repeat" && evalArgs[i + 1]) {
+        repeat = parseInt(evalArgs[++i], 10);
+      }
+    }
+
+    if (!engine) {
+      console.error("Error: --engine is required");
+      printEvalUsage();
+      process.exit(1);
+    }
+
+    if (!caseId && !all) {
+      console.error("Error: --case or --all is required");
+      printEvalUsage();
+      process.exit(1);
+    }
+
+    try {
+      const results = await evalRun({
+        caseId,
+        all,
+        engine: engine as "claude",
+        repeat,
+      });
+
+      // Print results
+      let allPassed = true;
+      for (const result of results) {
+        const status = result.passed ? "PASS" : "FAIL";
+        console.log(`\n[${status}] ${result.caseId} (attempt ${result.attempt})`);
+        if (result.runId) {
+          console.log(`  Run ID: ${result.runId}`);
+        }
+        console.log(`  Pipeline: ${result.pipelineStatus}`);
+        console.log(`  Decision: ${result.finalDecision ?? "N/A"}`);
+        console.log(`  Passed: ${result.passed}`);
+
+        if (result.failureReasons.length > 0) {
+          console.log(`  Failures:`);
+          for (const reason of result.failureReasons) {
+            console.log(`    - ${reason}`);
+          }
+        }
+
+        if (!result.passed) {
+          allPassed = false;
+        }
+      }
+
+      // Print summary for repeat > 1
+      if (repeat > 1) {
+        const caseIds = [...new Set(results.map(r => r.caseId))];
+        for (const cid of caseIds) {
+          const caseResults = results.filter(r => r.caseId === cid);
+          const passCount = caseResults.filter(r => r.passed).length;
+          const passRate = (passCount / caseResults.length * 100).toFixed(1);
+          console.log(`\n${cid}: ${passCount}/${caseResults.length} passed (${passRate}%)`);
+        }
+      }
+
+      if (!allPassed) {
+        process.exit(1);
+      }
+    } catch (error) {
+      if (error instanceof EvalError) {
+        console.error(`Error: ${error.message}`);
+      } else if (error instanceof Error) {
+        console.error("Unexpected error:", error.message);
+      } else {
+        console.error("Unexpected error:", error);
+      }
+      process.exit(1);
+    }
+  } else {
+    console.error(`Unknown subcommand: ${subcommand}`);
+    printUsage();
+    process.exit(1);
+  }
 } else {
   console.error(`Unknown command: ${command}`);
   printUsage();
@@ -521,5 +624,23 @@ Options:
 
 Example:
   ca review run --base origin/main --head HEAD --engine claude --dry-run
+`);
+}
+
+function printEvalUsage(): void {
+  console.log(`
+Usage: ca eval run --case <case-id> --engine claude [--repeat <n>]
+       ca eval run --all --engine claude [--repeat <n>]
+
+Options:
+  --case <case-id>  Run a specific case
+  --all             Run all cases
+  --engine <engine> Engine to use (currently only claude)
+  --repeat <n>      Repeat each case n times (default: 1)
+  --help            Show this help message
+
+Example:
+  ca eval run --case case-001-error-state-not-restored --engine claude
+  ca eval run --all --engine claude --repeat 3
 `);
 }

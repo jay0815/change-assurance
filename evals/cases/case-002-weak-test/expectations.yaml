@@ -1,0 +1,29 @@
+id: case-002-weak-test
+
+expected:
+  allowedFinalDecisions:
+    - not_ready_to_merge
+
+  mustFind:
+    - id: weak-test-assertion
+      sourceStage: test-review
+      minImpact: material
+      evidencePaths:
+        - src/calculator.test.js
+      anyTextPatterns:
+        - "assertion"
+        - "assert"
+        - "expect"
+        - "weak"
+
+  mustNotFind:
+    - mergeBlocking: true
+      reason: "No unsupported blocker is allowed"
+
+  coverage:
+    requiredAreas:
+      - src/calculator.js
+      - src/calculator.test.js
+
+  verification:
+    expectedFailedCommands: []

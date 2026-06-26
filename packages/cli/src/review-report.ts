@@ -16,7 +16,6 @@ import type {
   CoverageLedger,
   ReviewReport,
   ReviewReportIssue,
-  MergeRecommendation,
 } from "@change-assurance/core";
 
 export class ReportError extends Error {
@@ -212,7 +211,7 @@ function buildDiagnosticMarkdown(validation: ValidationResult): string {
   return lines.join("\n");
 }
 
-function buildFullMarkdown(report: ReviewReport, synthesis: Synthesis | null, issueLedger: IssueLedger | null): string {
+function buildFullMarkdown(report: ReviewReport, synthesis: Synthesis | null, _issueLedger: IssueLedger | null): string {
   const lines: string[] = [];
   lines.push("# Code Review Report");
   lines.push("");

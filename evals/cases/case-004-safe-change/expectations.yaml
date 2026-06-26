@@ -1,0 +1,20 @@
+id: case-004-safe-change
+
+expected:
+  allowedFinalDecisions:
+    - ready_to_merge
+    - insufficient_evidence
+
+  mustFind: []
+
+  mustNotFind:
+    - mergeBlocking: true
+      reason: "Safe change should not have blockers"
+
+  coverage:
+    requiredAreas:
+      - src/utils.js
+      - src/utils.test.js
+
+  verification:
+    expectedFailedCommands: []

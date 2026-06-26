@@ -1,0 +1,19 @@
+id: case-003-verification-failure
+
+expected:
+  allowedFinalDecisions:
+    - not_ready_to_merge
+
+  mustFind: []
+
+  mustNotFind:
+    - mergeBlocking: true
+      reason: "No unsupported blocker is allowed"
+
+  coverage:
+    requiredAreas:
+      - src/index.js
+
+  verification:
+    expectedFailedCommands:
+      - "check"

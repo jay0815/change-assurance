@@ -1,0 +1,29 @@
+id: case-005-insufficient-context
+
+expected:
+  allowedFinalDecisions:
+    - insufficient_evidence
+    - not_ready_to_merge
+
+  mustFind:
+    - id: insufficient-context
+      sourceStage: behavior-review
+      minImpact: needs_context
+      evidencePaths:
+        - src/payment.js
+      anyTextPatterns:
+        - "missing"
+        - "context"
+        - "validation"
+        - "business"
+
+  mustNotFind:
+    - mergeBlocking: true
+      reason: "No unsupported blocker is allowed"
+
+  coverage:
+    requiredAreas:
+      - src/payment.js
+
+  verification:
+    expectedFailedCommands: []

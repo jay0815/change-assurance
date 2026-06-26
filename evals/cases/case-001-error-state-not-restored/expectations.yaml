@@ -1,0 +1,28 @@
+id: case-001-error-state-not-restored
+
+expected:
+  allowedFinalDecisions:
+    - not_ready_to_merge
+
+  mustFind:
+    - id: failure-state-not-restored
+      sourceStage: behavior-review
+      minImpact: material
+      evidencePaths:
+        - src/submit.js
+      anyTextPatterns:
+        - "retry"
+        - "submitting"
+        - "failure"
+        - "isSubmitting"
+
+  mustNotFind:
+    - mergeBlocking: true
+      reason: "No unsupported blocker is allowed"
+
+  coverage:
+    requiredAreas:
+      - src/submit.js
+
+  verification:
+    expectedFailedCommands: []

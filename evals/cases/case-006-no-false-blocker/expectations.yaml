@@ -1,0 +1,19 @@
+id: case-006-no-false-blocker
+
+expected:
+  allowedFinalDecisions:
+    - ready_to_merge
+    - insufficient_evidence
+
+  mustFind: []
+
+  mustNotFind:
+    - mergeBlocking: true
+      reason: "Mechanical refactor should not create blockers"
+
+  coverage:
+    requiredAreas:
+      - src/config.js
+
+  verification:
+    expectedFailedCommands: []
