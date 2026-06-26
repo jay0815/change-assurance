@@ -1,0 +1,30 @@
+packages/adapter-claude/src/claude-adapter.ts
+  9e02ae5a5077f0f6 82-83,124
+packages/cli/src/__tests__/review-stage.test.ts
+  9e02ae5a5077f0f6 86-88,132,140,155,173,190,207,224,241,258,266,274-275,284-309,318-319,330
+packages/adapter-claude/src/__tests__/claude-adapter.test.ts
+  9e02ae5a5077f0f6 59,66-73,90
+packages/cli/src/review-stage.ts
+  9e02ae5a5077f0f6 267,304-308,330-332,377,384,391,402,405,437,466,468-469,544,546-547,863,865
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "d39459adde1a280088f134b2b1e2675f36476564",
+  "prompts": {
+    "9e02ae5a5077f0f6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fa549a32-aae7-4dd1-ad43-1f15d4d9921b",
+        "model": "mimo-v2.5-pro"
+      },
+      "human_author": "guanchengqian",
+      "messages": [],
+      "total_additions": 104,
+      "total_deletions": 50,
+      "accepted_lines": 88,
+      "overriden_lines": 0,
+      "messages_url": "http://10.1.138.136:9188/cas/1248c4635952e145c4555b1e307dcec9365f7145c3d949e38e32f98dab1bb2f4"
+    }
+  }
+}
