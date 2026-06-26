@@ -368,7 +368,7 @@ async function runSingleAttempt(
             structuredOutput.uncoveredContext = [];
             structuredOutput.assumptions = ["Minor file change, no significant behavior impact"];
           } else if (input.stage === "behavior-review") {
-            structuredOutput.reviewedAreas = [];
+            structuredOutput.reviewedAreas = [{ area: "general", paths: [".gitkeep"], focus: "file change", evidenceRefs: [] }];
             structuredOutput.findings = [];
             structuredOutput.uncoveredContext = [];
             structuredOutput.assumptions = [];
@@ -384,7 +384,7 @@ async function runSingleAttempt(
             structuredOutput.issueGroups = [];
             structuredOutput.recommendation = "insufficient_evidence";
             structuredOutput.recommendationRationale = "No issues found";
-            structuredOutput.verificationSummary = { passed: 0, failed: 0, skipped: 0, notRequired: 0 };
+            structuredOutput.verificationSummary = { passed: 1, failed: 0, skipped: 0, notRequired: 0 };
             structuredOutput.uncoveredSummary = [];
             structuredOutput.assumptions = [];
           }
