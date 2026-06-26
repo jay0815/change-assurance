@@ -83,7 +83,9 @@ describe("reviewStage", () => {
     mockGetHeadCommit.mockReturnValue("abc123");
     mockIsWorkingTreeDirty.mockReturnValue(false);
 
-    return runId;
+    const inputManifestHash = sha256(JSON.stringify(manifest, null, 2));
+
+    return { runId, inputManifestHash };
   }
 
   function createFakeAdapter(output: any) {
@@ -127,7 +129,7 @@ describe("reviewStage", () => {
   });
 
   it("should generate change-map.json with valid adapter output", async () => {
-    const runId = createRunFixture();
+    const { runId, inputManifestHash } = createRunFixture();
     const adapterOutput = {
       changedModules: [{ path: "src/index.ts", role: "entry", changeSummary: "modified" }],
       behaviorChanges: [],
@@ -135,6 +137,7 @@ describe("reviewStage", () => {
       reviewPriorities: [],
       uncoveredContext: [],
       assumptions: ["Minimal change, no behavior impact"],
+      sourceArtifacts: { inputManifestHash, policySnapshotHash: sha256(stringify({ version: 1 })) },
     };
 
     const adapter = createFakeAdapter(adapterOutput);
@@ -149,7 +152,7 @@ describe("reviewStage", () => {
   });
 
   it("should reject output with blocker field", async () => {
-    const runId = createRunFixture();
+    const { runId } = createRunFixture();
     const adapterOutput = {
       changedModules: [],
       behaviorChanges: [],
@@ -167,7 +170,7 @@ describe("reviewStage", () => {
   });
 
   it("should reject output with invalid evidenceRefs", async () => {
-    const runId = createRunFixture();
+    const { runId } = createRunFixture();
     const adapterOutput = {
       changedModules: [],
       behaviorChanges: [{ summary: "test", evidenceRefs: ["nonexistent-artifact"] }],
@@ -184,7 +187,7 @@ describe("reviewStage", () => {
   });
 
   it("should save raw output on adapter failure", async () => {
-    const runId = createRunFixture();
+    const { runId } = createRunFixture();
     const adapter = {
       detectCapabilities: () => ({ available: true, version: "2.1.153", supportsJsonOutput: true, supportsJsonSchema: true }),
       runStage: vi.fn().mockRejectedValue(new Error("Claude CLI failed")),
@@ -201,7 +204,7 @@ describe("reviewStage", () => {
   // Adequacy gate tests
 
   it("should reject empty changedModules when diff has changes", async () => {
-    const runId = createRunFixture();
+    const { runId } = createRunFixture();
     const adapterOutput = {
       changedModules: [],
       behaviorChanges: [],
@@ -218,7 +221,7 @@ describe("reviewStage", () => {
   });
 
   it("should reject changedModules referencing unchaged files", async () => {
-    const runId = createRunFixture();
+    const { runId } = createRunFixture();
     const adapterOutput = {
       changedModules: [{ path: "src/other.ts", role: "module", changeSummary: "changed" }],
       behaviorChanges: [],
@@ -235,7 +238,7 @@ describe("reviewStage", () => {
   });
 
   it("should reject empty analysis arrays without explanation", async () => {
-    const runId = createRunFixture();
+    const { runId } = createRunFixture();
     const adapterOutput = {
       changedModules: [{ path: "src/index.ts", role: "entry", changeSummary: "modified" }],
       behaviorChanges: [],
@@ -252,7 +255,7 @@ describe("reviewStage", () => {
   });
 
   it("should accept empty analysis arrays with explanation in assumptions", async () => {
-    const runId = createRunFixture();
+    const { runId, inputManifestHash } = createRunFixture();
     const adapterOutput = {
       changedModules: [{ path: "src/index.ts", role: "entry", changeSummary: "modified" }],
       behaviorChanges: [],
@@ -260,6 +263,7 @@ describe("reviewStage", () => {
       reviewPriorities: [],
       uncoveredContext: [],
       assumptions: ["No behavior changes identified due to limited diff context"],
+      sourceArtifacts: { inputManifestHash, policySnapshotHash: sha256(stringify({ version: 1 })) },
     };
 
     const adapter = createFakeAdapter(adapterOutput);
@@ -267,8 +271,8 @@ describe("reviewStage", () => {
     expect(result.stageArtifactPath).toContain("change-map.json");
   });
 
-  it("should reject sourceArtifacts with wrong hashes", async () => {
-    const runId = createRunFixture();
+  it("should reject sourceArtifacts with wrong inputManifestHash", async () => {
+    const { runId } = createRunFixture();
     const adapterOutput = {
       changedModules: [{ path: "src/index.ts", role: "entry", changeSummary: "modified" }],
       behaviorChanges: [],
@@ -277,8 +281,42 @@ describe("reviewStage", () => {
       uncoveredContext: [],
       assumptions: ["test"],
       sourceArtifacts: {
-        inputManifestHash: "wrong-hash",
-        policySnapshotHash: "wrong-hash",
+        inputManifestHash: "wrong-manifest-hash",
+        policySnapshotHash: sha256(stringify({ version: 1 })),
+      },
+    };
+
+    const adapter = createFakeAdapter(adapterOutput);
+    await expect(
+      reviewStage({ runId, stage: "change-map", adapter }),
+    ).rejects.toThrow(StageError);
+  });
+
+  it("should reject sourceArtifacts with wrong policySnapshotHash", async () => {
+    const { runId } = createRunFixture();
+    // Compute correct inputManifestHash
+    const policy = stringify({ version: 1 });
+    const changedFiles = [{ path: "src/index.ts", status: "modified", additions: 10, deletions: 5 }];
+    const gitState = { baseRef: "main", headRef: "HEAD", baseCommit: "base123", headCommit: "abc123", branch: "main", isDirty: false, timestamp: "2024-01-01T00:00:00.000Z" };
+    const manifest = {
+      runId, baseRef: "main", headRef: "HEAD", createdAt: "2024-01-01T00:00:00.000Z",
+      policySnapshotHash: sha256(policy),
+      diffHash: sha256("diff content"),
+      changedFilesHash: sha256(JSON.stringify(changedFiles, null, 2)),
+      gitStateHash: sha256(JSON.stringify(gitState, null, 2)),
+    };
+    const correctInputManifestHash = sha256(JSON.stringify(manifest, null, 2));
+
+    const adapterOutput = {
+      changedModules: [{ path: "src/index.ts", role: "entry", changeSummary: "modified" }],
+      behaviorChanges: [],
+      riskAreas: [],
+      reviewPriorities: [],
+      uncoveredContext: [],
+      assumptions: ["test"],
+      sourceArtifacts: {
+        inputManifestHash: correctInputManifestHash,
+        policySnapshotHash: "wrong-policy-hash",
       },
     };
 
@@ -289,7 +327,7 @@ describe("reviewStage", () => {
   });
 
   it("should reject changedModules with empty role or changeSummary", async () => {
-    const runId = createRunFixture();
+    const { runId } = createRunFixture();
     const adapterOutput = {
       changedModules: [{ path: "src/index.ts", role: "", changeSummary: "" }],
       behaviorChanges: [],

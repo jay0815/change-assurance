@@ -79,8 +79,8 @@ export class ClaudeAdapter {
       if (stdout.startsWith("[")) {
         rawOutput = JSON.parse(stdout);
       } else {
-        // stream-json format is one JSON object per line
-        const lines = stdout.split("\n");
+        // stream-json format is one JSON object per line (NDJSON)
+        const lines = stdout.split("\n").filter((line) => line.trim() !== "");
         rawOutput = lines.map((line) => JSON.parse(line));
       }
 
@@ -121,6 +121,6 @@ export class ClaudeAdapter {
         }
       }
     }
-    return {};
+    throw new AdapterError("No StructuredOutput found in Claude CLI output");
   }
 }

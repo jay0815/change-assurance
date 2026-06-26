@@ -264,7 +264,7 @@ function validateEvidenceRefs(output: ChangeMap, runDir: string): string[] {
   return errors;
 }
 
-function validateAdequacy(output: ChangeMap, changedFiles: Array<{ path: string }>, manifest: InputManifest): string[] {
+function validateAdequacy(output: ChangeMap, changedFiles: Array<{ path: string }>, manifest: InputManifest, inputManifestHash: string): string[] {
   const errors: string[] = [];
 
   // Rule 1: changedModules must not be empty when there are changes
@@ -301,9 +301,11 @@ function validateAdequacy(output: ChangeMap, changedFiles: Array<{ path: string 
     }
   }
 
-  // Rule 3: sourceArtifacts hash validation
-  if (output.sourceArtifacts) {
-    if (output.sourceArtifacts.inputManifestHash !== manifest.policySnapshotHash) {
+  // Rule 3: sourceArtifacts hash validation (required)
+  if (!output.sourceArtifacts) {
+    errors.push("sourceArtifacts is required");
+  } else {
+    if (output.sourceArtifacts.inputManifestHash !== inputManifestHash) {
       errors.push("sourceArtifacts.inputManifestHash mismatch");
     }
     if (output.sourceArtifacts.policySnapshotHash !== manifest.policySnapshotHash) {
@@ -325,7 +327,9 @@ export async function reviewStage(options: StageOptions): Promise<{ stageArtifac
   }
 
   const manifestPath = resolve(inputDir, INPUT_ARTIFACTS.INPUT_MANIFEST);
-  const manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as InputManifest;
+  const manifestContent = readFileSync(manifestPath, "utf-8");
+  const manifest = JSON.parse(manifestContent) as InputManifest;
+  const inputManifestHash = sha256(manifestContent);
 
   const policySnapshotPath = resolve(inputDir, INPUT_ARTIFACTS.POLICY_SNAPSHOT);
   const policySnapshotContent = readFileSync(policySnapshotPath, "utf-8");
@@ -370,21 +374,21 @@ export async function reviewStage(options: StageOptions): Promise<{ stageArtifac
   if (stage === "change-map") {
     return runChangeMapStage({
       runId, runDir, cwd, adapter, manifest, diffContent, changedFilesContent,
-      policySnapshotContent, verificationLedgerHash, stagesDir,
+      policySnapshotContent, verificationLedgerHash, stagesDir, inputManifestHash,
     });
   }
 
   if (stage === "behavior-review") {
     return runBehaviorReviewStage({
       runId, runDir, cwd, adapter, manifest, diffContent, changedFilesContent,
-      gitState, verificationLedgerHash, stagesDir,
+      gitState, verificationLedgerHash, stagesDir, inputManifestHash,
     });
   }
 
   if (stage === "test-review") {
     return runTestReviewStage({
       runId, runDir, cwd, adapter, manifest, diffContent, changedFilesContent,
-      gitState, verificationLedgerHash, stagesDir,
+      gitState, verificationLedgerHash, stagesDir, inputManifestHash,
     });
   }
 
@@ -395,9 +399,10 @@ async function runChangeMapStage(ctx: {
   runId: string; runDir: string; cwd: string; adapter: ReviewStageAdapter;
   manifest: InputManifest; diffContent: string; changedFilesContent: string;
   policySnapshotContent: string; verificationLedgerHash?: string; stagesDir: string;
+  inputManifestHash: string;
 }): Promise<{ stageArtifactPath: string }> {
   const { runId, runDir, cwd, adapter, manifest, diffContent, changedFilesContent,
-    policySnapshotContent, verificationLedgerHash } = ctx;
+    policySnapshotContent, verificationLedgerHash, inputManifestHash } = ctx;
   const stage = "change-map";
 
   const prompt = buildChangeMapPrompt(diffContent, changedFilesContent, policySnapshotContent);
@@ -429,7 +434,7 @@ async function runChangeMapStage(ctx: {
   }
 
   const changedFiles = JSON.parse(changedFilesContent) as Array<{ path: string }>;
-  const adequacyErrors = validateAdequacy(changeMap, changedFiles, manifest);
+  const adequacyErrors = validateAdequacy(changeMap, changedFiles, manifest, inputManifestHash);
   if (adequacyErrors.length > 0) {
     throw new StageError(`Adequacy gate failed: ${adequacyErrors.join(", ")}`);
   }
@@ -437,7 +442,7 @@ async function runChangeMapStage(ctx: {
   const artifact: ChangeMap = {
     runId, stage: "change-map", createdAt: new Date().toISOString(),
     sourceArtifacts: {
-      inputManifestHash: manifest.policySnapshotHash,
+      inputManifestHash,
       policySnapshotHash: manifest.policySnapshotHash,
       verificationLedgerHash,
     },
@@ -458,9 +463,10 @@ async function runBehaviorReviewStage(ctx: {
   runId: string; runDir: string; cwd: string; adapter: ReviewStageAdapter;
   manifest: InputManifest; diffContent: string; changedFilesContent: string;
   gitState: { headCommit: string }; verificationLedgerHash?: string; stagesDir: string;
+  inputManifestHash: string;
 }): Promise<{ stageArtifactPath: string }> {
-  const { runId, cwd, adapter, manifest, diffContent, changedFilesContent,
-    gitState, verificationLedgerHash, stagesDir } = ctx;
+  const { runId, cwd, adapter, diffContent, changedFilesContent,
+    gitState, verificationLedgerHash, stagesDir, inputManifestHash } = ctx;
   const stage = "behavior-review";
 
   // Prerequisite: change-map.json must exist and be valid
@@ -516,7 +522,7 @@ async function runBehaviorReviewStage(ctx: {
   const artifact: BehaviorReview = {
     runId, stage: "behavior-review", createdAt: new Date().toISOString(),
     sourceArtifacts: {
-      inputManifestHash: manifest.policySnapshotHash,
+      inputManifestHash,
       changeMapHash,
       verificationLedgerHash,
     },
@@ -535,9 +541,10 @@ async function runTestReviewStage(ctx: {
   runId: string; runDir: string; cwd: string; adapter: ReviewStageAdapter;
   manifest: InputManifest; diffContent: string; changedFilesContent: string;
   gitState: { headCommit: string }; verificationLedgerHash?: string; stagesDir: string;
+  inputManifestHash: string;
 }): Promise<{ stageArtifactPath: string }> {
-  const { runId, cwd, adapter, manifest, diffContent, changedFilesContent,
-    gitState, verificationLedgerHash, stagesDir } = ctx;
+  const { runId, cwd, adapter, diffContent, changedFilesContent,
+    gitState, verificationLedgerHash, stagesDir, inputManifestHash } = ctx;
   const stage = "test-review";
 
   // Prerequisite: change-map.json and behavior-review.json must exist
@@ -646,7 +653,7 @@ async function runTestReviewStage(ctx: {
   const artifact: TestReview = {
     runId, stage: "test-review", createdAt: new Date().toISOString(),
     sourceArtifacts: {
-      inputManifestHash: manifest.policySnapshotHash,
+      inputManifestHash,
       changeMapHash,
       behaviorReviewHash,
       verificationLedgerHash,
@@ -853,6 +860,7 @@ const CHANGE_MAP_SCHEMA = {
     reviewPriorities: { type: "array" },
     uncoveredContext: { type: "array" },
     assumptions: { type: "array" },
+    sourceArtifacts: { type: "object" },
   },
-  required: ["changedModules", "behaviorChanges", "riskAreas", "reviewPriorities", "uncoveredContext", "assumptions"],
+  required: ["changedModules", "behaviorChanges", "riskAreas", "reviewPriorities", "uncoveredContext", "assumptions", "sourceArtifacts"],
 };

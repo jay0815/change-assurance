@@ -56,13 +56,21 @@ describe("ClaudeAdapter", () => {
     });
 
     it("should return structured output on success", async () => {
-      const mockOutput = JSON.stringify({
+      const structuredData = {
         changedModules: [],
         behaviorChanges: [],
         riskAreas: [],
         reviewPriorities: [],
         uncoveredContext: [],
         assumptions: [],
+      };
+      const mockOutput = JSON.stringify({
+        type: "assistant",
+        message: {
+          content: [
+            { type: "tool_use", name: "StructuredOutput", input: structuredData },
+          ],
+        },
       });
 
       mockSpawnSync.mockReturnValue({
@@ -79,7 +87,7 @@ describe("ClaudeAdapter", () => {
       });
 
       expect(result.rawOutput).toBeDefined();
-      expect(result.structuredOutput).toBeDefined();
+      expect(result.structuredOutput).toEqual(structuredData);
     });
 
     it("should throw AdapterError on non-zero exit", async () => {
