@@ -11,6 +11,7 @@ import { reviewStage } from "./review-stage.js";
 import { generateLedgers } from "./review-ledger.js";
 import { reviewValidate } from "./review-validate.js";
 import { reviewReport } from "./review-report.js";
+import { loadPolicy } from "./policy.js";
 import type {
   ReviewStage,
   VerificationLedger,
@@ -116,8 +117,10 @@ export async function reviewRun(options: RunOptions): Promise<ReviewRunResult> {
     throw new RunError("Claude CLI not available.");
   }
 
-  // Default refs
-  const base = options.base ?? "origin/main";
+  // Default refs - use policy.defaultBaseRef if available, otherwise "origin/main"
+  const policy = loadPolicy(process.cwd());
+  const defaultBase = policy.review?.defaultBaseRef ?? "origin/main";
+  const base = options.base ?? defaultBase;
   const head = options.head ?? "HEAD";
 
   // Step 1: Prepare
