@@ -95,7 +95,7 @@ export interface VerificationLedger {
 }
 
 // Stage types
-export type ReviewStage = "change-map" | "behavior-review" | "test-review" | "evidence-audit";
+export type ReviewStage = "change-map" | "behavior-review" | "test-review" | "evidence-audit" | "synthesis";
 
 export interface ChangedModule {
   path: string;
@@ -323,4 +323,116 @@ export interface CoverageLedger {
     uncovered: number;
     needsContext: number;
   };
+}
+
+// Synthesis types
+
+export type MergeRecommendation =
+  | "ready_to_merge"
+  | "not_ready_to_merge"
+  | "insufficient_evidence"
+  | "escalate";
+
+export interface IssueGroup {
+  title: string;
+  issueIds: string[];
+  summary: string;
+}
+
+export interface Synthesis {
+  runId: string;
+  stage: "synthesis";
+  createdAt: string;
+  sourceArtifacts: {
+    issueLedgerHash: string;
+    coverageLedgerHash: string;
+    verificationLedgerHash?: string;
+  };
+  recommendation: MergeRecommendation;
+  recommendationRationale: string;
+  issueGroups: IssueGroup[];
+  verificationSummary: {
+    passed: number;
+    failed: number;
+    skipped: number;
+    notRequired: number;
+    note: string;
+  };
+  uncoveredSummary: Array<{
+    coverageItemId: string;
+    status: "uncovered" | "needs_context";
+    summary: string;
+  }>;
+  assumptions: string[];
+}
+
+// Validation types
+
+export type ValidationStatus = "valid" | "blocked" | "invalidated";
+
+export interface ValidationSourceArtifact {
+  path: string;
+  hash: string;
+}
+
+export interface ValidationError {
+  code: string;
+  message: string;
+  artifactPath?: string;
+}
+
+export interface ValidationResult {
+  runId: string;
+  createdAt: string;
+  status: ValidationStatus;
+  finalDecision: MergeRecommendation | null;
+  sourceArtifacts: ValidationSourceArtifact[];
+  errors: ValidationError[];
+  warnings: string[];
+}
+
+// Report types
+
+export interface ReviewReportIssue {
+  id: string;
+  title: string;
+  candidateImpact: string;
+  status: string;
+  summary: string;
+}
+
+export interface ReviewReport {
+  runId: string;
+  createdAt: string;
+  status: ValidationStatus;
+  finalDecision: MergeRecommendation | null;
+  recommendationRationale: string;
+  issues: {
+    blocking: ReviewReportIssue[];
+    material: ReviewReportIssue[];
+    advisory: ReviewReportIssue[];
+    needsContext: ReviewReportIssue[];
+  };
+  verificationSummary: {
+    passed: number;
+    failed: number;
+    skipped: number;
+    notRequired: number;
+    note: string;
+  };
+  coverageSummary: {
+    reviewed: number;
+    toolVerified: number;
+    uncovered: number;
+    needsContext: number;
+  };
+  uncoveredAreas: Array<{
+    coverageItemId: string;
+    area: string;
+    status: "uncovered" | "needs_context";
+    reason: string;
+  }>;
+  sourceArtifacts: ValidationSourceArtifact[];
+  errors: ValidationError[];
+  warnings: string[];
 }

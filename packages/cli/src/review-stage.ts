@@ -7,6 +7,8 @@ import {
   getStageArtifactPath,
   getStageRawArtifactPath,
   getVerificationLedgerPath,
+  getIssueLedgerPath,
+  getCoverageLedgerPath,
   INPUT_ARTIFACTS,
   getHeadCommit,
   getFileContentAtCommit,
@@ -18,6 +20,10 @@ import type {
   BehaviorReview,
   TestReview,
   EvidenceAudit,
+  IssueLedger,
+  CoverageLedger,
+  VerificationLedger,
+  Synthesis,
   ReviewStage,
 } from "@change-assurance/core";
 
@@ -420,6 +426,12 @@ export async function reviewStage(options: StageOptions): Promise<{ stageArtifac
     return runEvidenceAuditStage({
       runId, runDir, cwd, adapter, manifest, diffContent, changedFilesContent,
       gitState, verificationLedgerHash, stagesDir, inputManifestHash,
+    });
+  }
+
+  if (stage === "synthesis") {
+    return runSynthesisStage({
+      runId, runDir, cwd, adapter,
     });
   }
 
@@ -975,6 +987,288 @@ async function runEvidenceAuditStage(ctx: {
     auditedFindings: evidenceAudit.auditedFindings,
     summary: evidenceAudit.summary,
     assumptions: evidenceAudit.assumptions,
+  };
+
+  const artifactPath = resolve(cwd, getStageArtifactPath(runId, stage));
+  writeFileSync(artifactPath, JSON.stringify(artifact, null, 2));
+  return { stageArtifactPath: artifactPath };
+}
+
+// Synthesis stage
+
+const MAX_ISSUES_IN_PROMPT = 50;
+
+function buildSynthesisPrompt(
+  issueLedger: IssueLedger,
+  coverageLedger: CoverageLedger,
+  verificationLedger: VerificationLedger | undefined,
+): string {
+  // Sort issues: blocking first, then material, then advisory, then needs_context
+  const impactOrder: Record<string, number> = { merge_blocking: 0, material: 1, advisory: 2, needs_context: 3 };
+  const sortedIssues = [...issueLedger.issues]
+    .sort((a, b) => (impactOrder[a.candidateImpact] ?? 99) - (impactOrder[b.candidateImpact] ?? 99));
+
+  // Truncate if too many issues
+  const truncatedCount = Math.max(0, sortedIssues.length - MAX_ISSUES_IN_PROMPT);
+  const issuesForPrompt = sortedIssues.slice(0, MAX_ISSUES_IN_PROMPT);
+
+  const issuesList = issuesForPrompt.map((i) =>
+    `  - [${i.id}] (${i.candidateImpact}, ${i.status}) ${i.title}\n    summary: ${i.summary}\n    impact: ${i.impact}\n    recommendation: ${i.recommendation}`,
+  ).join("\n");
+
+  const uncoveredList = coverageLedger.items
+    .filter((i) => i.status === "uncovered" || i.status === "needs_context")
+    .map((i) => `  - [${i.id}] (${i.status}) ${i.area}: ${i.reason}`)
+    .join("\n");
+
+  let verificationNote: string;
+  if (verificationLedger) {
+    const failedCmds = verificationLedger.commands
+      .filter((c) => c.status === "failed")
+      .map((c) => c.id);
+    verificationNote = `- Verification: status=${verificationLedger.runStatus}, passed=${verificationLedger.summary.passed}, failed=${verificationLedger.summary.failed}, failedCommands=[${failedCmds.join(", ")}]`;
+  } else {
+    verificationNote = "- Verification: NOT AVAILABLE";
+  }
+
+  return `You are performing a synthesis review for a code review.
+
+TASK: Group issues by risk and theme, summarize verification and coverage, and provide a candidate merge recommendation.
+
+CONSTRAINTS:
+1. You are NOT a new reviewer. Do NOT add new issues or evidence.
+2. You can ONLY reference issue IDs from the issue ledger below.
+3. Do NOT invent new evidenceRefs. Use only what exists in the issue ledger.
+4. Do NOT change any issue's candidateImpact, status, or evidenceClass.
+5. Do NOT convert needs_context into blocking.
+6. Do NOT describe unexecuted verification as passed.
+7. Do NOT reinterpret rejected findings.
+8. Your recommendation must reflect the actual state of issues and verification.
+
+RECOMMENDATION RULES:
+- ready_to_merge: no blocking candidates, no failed verification, uncovered areas acceptable
+- not_ready_to_merge: blocking candidates exist or critical verification failed
+- insufficient_evidence: key uncovered/needs_context areas, cannot assess risk
+- escalate: conflicting signals, need human judgment
+
+ISSUE LEDGER (${issueLedger.issues.length} issues${truncatedCount > 0 ? `, showing top ${MAX_ISSUES_IN_PROMPT}, ${truncatedCount} truncated` : ""}):
+${issuesList || "  (no issues)"}
+
+${uncoveredList ? `UNCOVERED / NEEDS_CONTEXT AREAS:\n${uncoveredList}` : "UNCOVERED / NEEDS_CONTEXT AREAS: (none)"}
+
+${verificationNote}
+
+OUTPUT FORMAT (JSON):
+{
+  "recommendation": "ready_to_merge|not_ready_to_merge|insufficient_evidence|escalate",
+  "recommendationRationale": "...",
+  "issueGroups": [{
+    "title": "group name",
+    "issueIds": ["issue-br-F001", "issue-tr-T001"],
+    "summary": "..."
+  }],
+  "verificationSummary": {
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0,
+    "notRequired": 0,
+    "note": "..."
+  },
+  "uncoveredSummary": [{
+    "coverageItemId": "cov-1",
+    "status": "uncovered|needs_context",
+    "summary": "..."
+  }],
+  "assumptions": ["..."]
+}`;
+}
+
+const SYNTHESIS_SCHEMA = {
+  type: "object",
+  properties: {
+    recommendation: { type: "string" },
+    recommendationRationale: { type: "string" },
+    issueGroups: { type: "array" },
+    verificationSummary: { type: "object" },
+    uncoveredSummary: { type: "array" },
+    assumptions: { type: "array" },
+  },
+  required: ["recommendation", "recommendationRationale", "issueGroups", "verificationSummary", "uncoveredSummary", "assumptions"],
+};
+
+function validateSynthesisForbiddenFields(output: any): string[] {
+  const errors: string[] = [];
+  const forbiddenFields = ["blocker", "issue", "severity", "blocking", "approve", "requestChanges"];
+  for (const field of forbiddenFields) {
+    if (field in output) {
+      errors.push(`Forbidden field: ${field}`);
+    }
+  }
+  return errors;
+}
+
+function validateSynthesis(output: Synthesis, issueLedger: IssueLedger, verificationLedger: VerificationLedger | undefined): string[] {
+  const errors: string[] = [];
+
+  // Build valid issue ID set
+  const validIssueIds = new Set(issueLedger.issues.map((i) => i.id));
+
+  // Validate issueGroups reference valid issue IDs
+  for (const group of output.issueGroups) {
+    for (const issueId of group.issueIds) {
+      if (!validIssueIds.has(issueId)) {
+        errors.push(`issueGroup references unknown issueId: ${issueId}`);
+      }
+    }
+  }
+
+  // Validate no new evidenceRefs in issueGroups
+  // (issueGroups should not have evidenceRefs field at all — it's not in the schema)
+  for (const group of output.issueGroups) {
+    if ("evidenceRefs" in group) {
+      errors.push(`issueGroup "${group.title}" contains forbidden evidenceRefs`);
+    }
+  }
+
+  // Validate recommendation is a valid MergeRecommendation value
+  const validRecommendations = ["ready_to_merge", "not_ready_to_merge", "insufficient_evidence", "escalate"];
+  if (!validRecommendations.includes(output.recommendation)) {
+    errors.push(`Invalid recommendation: ${output.recommendation}. Must be one of: ${validRecommendations.join(", ")}`);
+  }
+
+  // Validate recommendation against blocking issues
+  const hasBlockingIssues = issueLedger.issues.some((i) => i.candidateImpact === "merge_blocking");
+  if (hasBlockingIssues && output.recommendation === "ready_to_merge") {
+    errors.push("Cannot recommend ready_to_merge with merge_blocking issues present");
+  }
+
+  // Validate recommendation against failed verification
+  const hasFailedVerification = verificationLedger
+    ? verificationLedger.commands.some((c) => c.status === "failed")
+    : false;
+  if (hasFailedVerification && output.recommendation === "ready_to_merge") {
+    errors.push("Cannot recommend ready_to_merge with failed verification commands");
+  }
+
+  // Validate verificationSummary matches actual verification ledger
+  if (verificationLedger) {
+    const vl = verificationLedger;
+    if (output.verificationSummary.passed !== vl.summary.passed) {
+      errors.push(`verificationSummary.passed mismatch: expected ${vl.summary.passed}, got ${output.verificationSummary.passed}`);
+    }
+    if (output.verificationSummary.failed !== vl.summary.failed) {
+      errors.push(`verificationSummary.failed mismatch: expected ${vl.summary.failed}, got ${output.verificationSummary.failed}`);
+    }
+  }
+
+  return errors;
+}
+
+async function runSynthesisStage(ctx: {
+  runId: string; runDir: string; cwd: string; adapter: ReviewStageAdapter;
+}): Promise<{ stageArtifactPath: string }> {
+  const { runId, cwd, adapter } = ctx;
+  const stage = "synthesis";
+
+  // Read ledgers
+  const issueLedgerPath = resolve(cwd, getIssueLedgerPath(runId));
+  const coverageLedgerPath = resolve(cwd, getCoverageLedgerPath(runId));
+  const verificationLedgerPath = resolve(cwd, getVerificationLedgerPath(runId));
+
+  if (!existsSync(issueLedgerPath)) {
+    throw new StageError("issue-ledger.json not found. Run `ca review ledger` first.");
+  }
+  if (!existsSync(coverageLedgerPath)) {
+    throw new StageError("coverage-ledger.json not found. Run `ca review ledger` first.");
+  }
+
+  const issueLedgerContent = readFileSync(issueLedgerPath, "utf-8");
+  const coverageLedgerContent = readFileSync(coverageLedgerPath, "utf-8");
+
+  const issueLedger = JSON.parse(issueLedgerContent) as IssueLedger;
+  const coverageLedger = JSON.parse(coverageLedgerContent) as CoverageLedger;
+
+  // Validate ledger belongs to this run
+  if (issueLedger.runId !== runId) {
+    throw new StageError(`issue-ledger runId mismatch: expected ${runId}, got ${issueLedger.runId}`);
+  }
+  if (coverageLedger.runId !== runId) {
+    throw new StageError(`coverage-ledger runId mismatch: expected ${runId}, got ${coverageLedger.runId}`);
+  }
+
+  const issueLedgerHash = sha256(issueLedgerContent);
+  const coverageLedgerHash = sha256(coverageLedgerContent);
+
+  // Read verification ledger if available
+  let verificationLedger: VerificationLedger | undefined;
+  let verificationLedgerHash: string | undefined;
+  if (existsSync(verificationLedgerPath)) {
+    const vlContent = readFileSync(verificationLedgerPath, "utf-8");
+    verificationLedger = JSON.parse(vlContent) as VerificationLedger;
+    if (verificationLedger.runId !== runId) {
+      throw new StageError(`verification-ledger runId mismatch: expected ${runId}, got ${verificationLedger.runId}`);
+    }
+    verificationLedgerHash = sha256(vlContent);
+  }
+
+  // Build prompt and call adapter
+  const prompt = buildSynthesisPrompt(issueLedger, coverageLedger, verificationLedger);
+
+  let rawMessages: unknown;
+  let structuredOutput: unknown;
+  try {
+    const result = await adapter.runStage({ stage, runDirectory: cwd, prompt, schema: SYNTHESIS_SCHEMA });
+    rawMessages = result.rawOutput;
+    structuredOutput = result.structuredOutput;
+  } catch (error) {
+    const rawPath = resolve(cwd, getStageRawArtifactPath(runId, stage));
+    writeFileSync(rawPath, JSON.stringify({ error: String(error) }, null, 2));
+    throw error;
+  }
+
+  const rawPath = resolve(cwd, getStageRawArtifactPath(runId, stage));
+  writeFileSync(rawPath, JSON.stringify(rawMessages, null, 2));
+
+  // Validate forbidden fields
+  const forbiddenErrors = validateSynthesisForbiddenFields(structuredOutput);
+  if (forbiddenErrors.length > 0) {
+    throw new StageError(`Invalid output: ${forbiddenErrors.join(", ")}`);
+  }
+
+  const synthesis = structuredOutput as Synthesis;
+
+  // Validate synthesis against ledger data
+  const synthesisErrors = validateSynthesis(synthesis, issueLedger, verificationLedger);
+  if (synthesisErrors.length > 0) {
+    throw new StageError(`Invalid synthesis: ${synthesisErrors.join(", ")}`);
+  }
+
+  // Build truncated issues assumption if needed
+  const assumptions = [...(synthesis.assumptions ?? [])];
+  const impactOrder: Record<string, number> = { merge_blocking: 0, material: 1, advisory: 2, needs_context: 3 };
+  const sortedIssues = [...issueLedger.issues]
+    .sort((a, b) => (impactOrder[a.candidateImpact] ?? 99) - (impactOrder[b.candidateImpact] ?? 99));
+  const truncatedCount = Math.max(0, sortedIssues.length - MAX_ISSUES_IN_PROMPT);
+  if (truncatedCount > 0) {
+    const truncationNote = `Truncated ${truncatedCount} low-priority advisory issues due to input capacity limits`;
+    if (!assumptions.some((a) => a.includes("Truncated"))) {
+      assumptions.push(truncationNote);
+    }
+  }
+
+  const artifact: Synthesis = {
+    runId, stage: "synthesis", createdAt: new Date().toISOString(),
+    sourceArtifacts: {
+      issueLedgerHash,
+      coverageLedgerHash,
+      verificationLedgerHash,
+    },
+    recommendation: synthesis.recommendation,
+    recommendationRationale: synthesis.recommendationRationale,
+    issueGroups: synthesis.issueGroups,
+    verificationSummary: synthesis.verificationSummary,
+    uncoveredSummary: synthesis.uncoveredSummary,
+    assumptions,
   };
 
   const artifactPath = resolve(cwd, getStageArtifactPath(runId, stage));

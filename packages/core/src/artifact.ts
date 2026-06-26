@@ -66,3 +66,23 @@ export function getIssueLedgerPath(runId: string): string {
 export function getCoverageLedgerPath(runId: string): string {
   return `${getLedgersDir(runId)}/coverage-ledger.json`;
 }
+
+export function getValidationDir(runId: string): string {
+  return `${getRunDir(runId)}/validation`;
+}
+
+export function getValidationResultPath(runId: string): string {
+  return `${getValidationDir(runId)}/validation-result.json`;
+}
+
+export function getReportDir(runId: string): string {
+  return `${getRunDir(runId)}/report`;
+}
+
+export function getReportMarkdownPath(runId: string): string {
+  return `${getReportDir(runId)}/review-report.md`;
+}
+
+export function getReportJsonPath(runId: string): string {
+  return `${getReportDir(runId)}/review-report.json`;
+}

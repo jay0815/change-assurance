@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 
+import { resolve } from "node:path";
 import { reviewPrepare, PrepareError } from "./review-prepare.js";
 import { reviewVerify, VerifyError } from "./review-verify.js";
 import { reviewStage, StageError } from "./review-stage.js";
 import { generateLedgers, LedgerError } from "./review-ledger.js";
+import { reviewValidate, ValidateError } from "./review-validate.js";
+import { reviewReport, ReportError } from "./review-report.js";
 import { ClaudeAdapter, AdapterError } from "@change-assurance/adapter-claude";
-import { GitError } from "@change-assurance/core";
+import { GitError, getValidationResultPath } from "@change-assurance/core";
 
 function printUsage(): void {
   console.log(`
@@ -16,6 +19,8 @@ Commands:
   review verify     Verify a review run
   review stage      Run a review stage
   review ledger     Generate issue and coverage ledgers
+  review validate   Validate artifact chain integrity
+  review report     Generate review report
 
 Options:
   --help            Show this help message
@@ -31,6 +36,7 @@ Stage:
   ca review stage --run <run-id> --stage behavior-review --engine claude
   ca review stage --run <run-id> --stage test-review --engine claude
   ca review stage --run <run-id> --stage evidence-audit --engine claude
+  ca review stage --run <run-id> --stage synthesis --engine claude
 `);
 }
 
@@ -204,8 +210,8 @@ if (command === "review") {
       process.exit(1);
     }
 
-    if (stage !== "change-map" && stage !== "behavior-review" && stage !== "test-review" && stage !== "evidence-audit") {
-      console.error(`Error: Unsupported stage: ${stage}. Supported: change-map, behavior-review, test-review, evidence-audit.`);
+    if (stage !== "change-map" && stage !== "behavior-review" && stage !== "test-review" && stage !== "evidence-audit" && stage !== "synthesis") {
+      console.error(`Error: Unsupported stage: ${stage}. Supported: change-map, behavior-review, test-review, evidence-audit, synthesis.`);
       process.exit(1);
     }
 
@@ -281,6 +287,87 @@ if (command === "review") {
       }
       process.exit(1);
     }
+  } else if (subcommand === "validate") {
+    const validateArgs = args.slice(2);
+    if (validateArgs.includes("--help")) {
+      printValidateUsage();
+      process.exit(0);
+    }
+
+    let runId: string | undefined;
+    for (let i = 0; i < validateArgs.length; i++) {
+      if (validateArgs[i] === "--run" && validateArgs[i + 1]) {
+        runId = validateArgs[++i];
+      }
+    }
+
+    if (!runId) {
+      console.error("Error: --run is required");
+      printValidateUsage();
+      process.exit(1);
+    }
+
+    try {
+      const result = reviewValidate({ runId });
+      console.log(`Validation completed: ${result.status}`);
+      if (result.finalDecision) {
+        console.log(`Final Decision: ${result.finalDecision}`);
+      }
+      console.log(`Artifact: ${resolve(process.cwd(), getValidationResultPath(runId))}`);
+
+      if (result.errors.length > 0) {
+        console.log(`\nErrors:`);
+        result.errors.forEach((err) => console.log(`  - [${err.code}] ${err.message}`));
+      }
+
+      if (result.status !== "valid") {
+        process.exit(1);
+      }
+    } catch (error) {
+      if (error instanceof ValidateError) {
+        console.error(`Error: ${error.message}`);
+      } else if (error instanceof Error) {
+        console.error("Unexpected error:", error.message);
+      } else {
+        console.error("Unexpected error:", error);
+      }
+      process.exit(1);
+    }
+  } else if (subcommand === "report") {
+    const reportArgs = args.slice(2);
+    if (reportArgs.includes("--help")) {
+      printReportUsage();
+      process.exit(0);
+    }
+
+    let runId: string | undefined;
+    for (let i = 0; i < reportArgs.length; i++) {
+      if (reportArgs[i] === "--run" && reportArgs[i + 1]) {
+        runId = reportArgs[++i];
+      }
+    }
+
+    if (!runId) {
+      console.error("Error: --run is required");
+      printReportUsage();
+      process.exit(1);
+    }
+
+    try {
+      const result = reviewReport({ runId });
+      console.log(`Report generated:`);
+      console.log(`  Markdown: ${result.reportMarkdownPath}`);
+      console.log(`  JSON: ${result.reportJsonPath}`);
+    } catch (error) {
+      if (error instanceof ReportError) {
+        console.error(`Error: ${error.message}`);
+      } else if (error instanceof Error) {
+        console.error("Unexpected error:", error.message);
+      } else {
+        console.error("Unexpected error:", error);
+      }
+      process.exit(1);
+    }
   } else {
     console.error(`Unknown subcommand: ${subcommand}`);
     printUsage();
@@ -312,7 +399,7 @@ Usage: ca review stage --run <run-id> --stage <stage> --engine <engine>
 
 Options:
   --run <run-id>      Run ID from prepare step
-  --stage <stage>     Stage to run (change-map, behavior-review, test-review, evidence-audit)
+  --stage <stage>     Stage to run (change-map, behavior-review, test-review, evidence-audit, synthesis)
   --engine <engine>   Engine to use (currently only claude)
   --help              Show this help message
 
@@ -321,5 +408,32 @@ Example:
   ca review stage --run abc123 --stage behavior-review --engine claude
   ca review stage --run abc123 --stage test-review --engine claude
   ca review stage --run abc123 --stage evidence-audit --engine claude
+  ca review stage --run abc123 --stage synthesis --engine claude
+`);
+}
+
+function printValidateUsage(): void {
+  console.log(`
+Usage: ca review validate --run <run-id>
+
+Options:
+  --run <run-id>  Run ID from prepare step
+  --help          Show this help message
+
+Example:
+  ca review validate --run abc123
+`);
+}
+
+function printReportUsage(): void {
+  console.log(`
+Usage: ca review report --run <run-id>
+
+Options:
+  --run <run-id>  Run ID from prepare step
+  --help          Show this help message
+
+Example:
+  ca review report --run abc123
 `);
 }
