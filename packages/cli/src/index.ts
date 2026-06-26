@@ -3,6 +3,7 @@
 import { reviewPrepare, PrepareError } from "./review-prepare.js";
 import { reviewVerify, VerifyError } from "./review-verify.js";
 import { reviewStage, StageError } from "./review-stage.js";
+import { generateLedgers, LedgerError } from "./review-ledger.js";
 import { ClaudeAdapter, AdapterError } from "@change-assurance/adapter-claude";
 import { GitError } from "@change-assurance/core";
 
@@ -14,6 +15,7 @@ Commands:
   review prepare    Prepare a review run
   review verify     Verify a review run
   review stage      Run a review stage
+  review ledger     Generate issue and coverage ledgers
 
 Options:
   --help            Show this help message
@@ -233,6 +235,52 @@ if (command === "review") {
       }
       process.exit(1);
     }
+  } else if (subcommand === "ledger") {
+    const ledgerArgs = args.slice(2);
+    if (ledgerArgs.includes("--help")) {
+      printLedgerUsage();
+      process.exit(0);
+    }
+
+    let runId: string | undefined;
+    let jsonOutput = false;
+    for (let i = 0; i < ledgerArgs.length; i++) {
+      if (ledgerArgs[i] === "--run" && ledgerArgs[i + 1]) {
+        runId = ledgerArgs[++i];
+      } else if (ledgerArgs[i] === "--json") {
+        jsonOutput = true;
+      }
+    }
+
+    if (!runId) {
+      console.error("Error: --run is required");
+      printLedgerUsage();
+      process.exit(1);
+    }
+
+    try {
+      const result = generateLedgers({ runId });
+
+      if (jsonOutput) {
+        const { readFileSync: readFile } = await import("node:fs");
+        const issueLedger = JSON.parse(readFile(result.issueLedgerPath, "utf-8"));
+        const coverageLedger = JSON.parse(readFile(result.coverageLedgerPath, "utf-8"));
+        console.log(JSON.stringify({ issueLedger: issueLedger.summary, coverageLedger: coverageLedger.summary }, null, 2));
+      } else {
+        console.log(`Ledgers generated:`);
+        console.log(`  Issue Ledger: ${result.issueLedgerPath}`);
+        console.log(`  Coverage Ledger: ${result.coverageLedgerPath}`);
+      }
+    } catch (error) {
+      if (error instanceof LedgerError) {
+        console.error(`Error: ${error.message}`);
+      } else if (error instanceof Error) {
+        console.error("Unexpected error:", error.message);
+      } else {
+        console.error("Unexpected error:", error);
+      }
+      process.exit(1);
+    }
   } else {
     console.error(`Unknown subcommand: ${subcommand}`);
     printUsage();
@@ -242,6 +290,20 @@ if (command === "review") {
   console.error(`Unknown command: ${command}`);
   printUsage();
   process.exit(1);
+}
+
+function printLedgerUsage(): void {
+  console.log(`
+Usage: ca review ledger --run <run-id>
+
+Options:
+  --run <run-id>  Run ID from prepare step
+  --json          Output summary as JSON
+  --help          Show this help message
+
+Example:
+  ca review ledger --run abc123
+`);
 }
 
 function printStageUsage(): void {

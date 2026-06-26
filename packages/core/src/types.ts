@@ -255,3 +255,72 @@ export interface EvidenceAudit {
   };
   assumptions: string[];
 }
+
+// Ledger types
+
+export type LedgerIssueStatus = "accepted" | "downgraded" | "needs_context";
+
+export interface LedgerIssue {
+  id: string;
+  sourceFindingRef: string;
+  sourceStage: "behavior-review" | "test-review";
+  status: LedgerIssueStatus;
+  evidenceClass: "observed" | "derived" | "hypothesis";
+  candidateImpact: "merge_blocking" | "material" | "advisory" | "needs_context";
+  title: string;
+  summary: string;
+  trigger?: string;
+  impact: string;
+  recommendation: string;
+  evidenceRefs: string[];
+  missingEvidence: string[];
+  missingContext: string[];
+  deduplicatedWith?: string;
+}
+
+export interface IssueLedger {
+  runId: string;
+  createdAt: string;
+  sourceArtifacts: {
+    evidenceAuditHash: string;
+    behaviorReviewHash: string;
+    testReviewHash: string;
+  };
+  issues: LedgerIssue[];
+  summary: {
+    accepted: number;
+    downgraded: number;
+    needsContext: number;
+    deduplicated: number;
+  };
+}
+
+export type CoverageStatus = "reviewed" | "tool_verified" | "uncovered" | "needs_context";
+
+export interface CoverageItem {
+  id: string;
+  area: string;
+  paths: string[];
+  status: CoverageStatus;
+  sources: Array<"change-map" | "behavior-review" | "test-review" | "verification">;
+  evidenceRefs: string[];
+  reason: string;
+}
+
+export interface CoverageLedger {
+  runId: string;
+  createdAt: string;
+  sourceArtifacts: {
+    changeMapHash: string;
+    behaviorReviewHash: string;
+    testReviewHash: string;
+    verificationLedgerHash?: string;
+  };
+  items: CoverageItem[];
+  summary: {
+    reviewed: number;
+    toolVerified: number;
+    uncovered: number;
+    needsContext: number;
+  };
+}

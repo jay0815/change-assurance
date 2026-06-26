@@ -821,7 +821,7 @@ function validateEvidenceAudit(
 function buildEvidenceAuditPrompt(
   behaviorReviewJson: string,
   testReviewJson: string,
-  headCommit: string,
+  _headCommit: string,
 ): string {
   // Build per-finding evidence lists for the prompt
   const brFindingsList = JSON.parse(behaviorReviewJson).findings.map((f: any) =>

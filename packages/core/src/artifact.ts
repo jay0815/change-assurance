@@ -54,3 +54,15 @@ export function getStageArtifactPath(runId: string, stage: string): string {
 export function getStageRawArtifactPath(runId: string, stage: string): string {
   return `${getStagesDir(runId)}/${stage}.raw.json`;
 }
+
+export function getLedgersDir(runId: string): string {
+  return `${getRunDir(runId)}/ledgers`;
+}
+
+export function getIssueLedgerPath(runId: string): string {
+  return `${getLedgersDir(runId)}/issue-ledger.json`;
+}
+
+export function getCoverageLedgerPath(runId: string): string {
+  return `${getLedgersDir(runId)}/coverage-ledger.json`;
+}
