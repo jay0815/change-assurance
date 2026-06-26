@@ -1,0 +1,30 @@
+packages/cli/src/index.ts
+  9e02ae5a5077f0f6 31,205-206,253,261
+packages/cli/src/review-stage.ts
+  9e02ae5a5077f0f6 20,419-425,687-984
+packages/cli/src/__tests__/review-stage.test.ts
+  9e02ae5a5077f0f6 907-1227
+packages/core/src/types.ts
+  9e02ae5a5077f0f6 98,221-257
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "10ce227e6254286146d8dc7d7c320a46b2140d95",
+  "prompts": {
+    "9e02ae5a5077f0f6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fa549a32-aae7-4dd1-ad43-1f15d4d9921b",
+        "model": "mimo-v2.5-pro"
+      },
+      "human_author": "guanchengqian",
+      "messages": [],
+      "total_additions": 681,
+      "total_deletions": 15,
+      "accepted_lines": 670,
+      "overriden_lines": 0,
+      "messages_url": "http://10.1.138.136:9188/cas/ba087c306aea1dd61e2e3f40dec1d69c2094069b5947d940bacc0e96b53330db"
+    }
+  }
+}
