@@ -95,7 +95,7 @@ export interface VerificationLedger {
 }
 
 // Stage types
-export type ReviewStage = "change-map";
+export type ReviewStage = "change-map" | "behavior-review" | "test-review";
 
 export interface ChangedModule {
   path: string;
@@ -138,6 +138,83 @@ export interface ChangeMap {
   behaviorChanges: BehaviorChange[];
   riskAreas: RiskArea[];
   reviewPriorities: ReviewPriority[];
+  uncoveredContext: UncoveredContext[];
+  assumptions: string[];
+}
+
+export interface ReviewedArea {
+  area: string;
+  paths: string[];
+  focus: string;
+  evidenceRefs: string[];
+}
+
+export interface BehaviorFinding {
+  id: string;
+  title: string;
+  type: "success_path" | "failure_path" | "state_transition" | "boundary_condition" | "regression_risk";
+  candidateImpact: "merge_blocking" | "material" | "advisory";
+  trigger: string;
+  observedBehavior: string;
+  expectedBehavior?: string;
+  impact: string;
+  recommendation: string;
+  evidenceRefs: string[];
+  confidence: "high" | "medium" | "low";
+}
+
+export interface BehaviorReview {
+  runId: string;
+  stage: "behavior-review";
+  createdAt: string;
+  sourceArtifacts: {
+    inputManifestHash: string;
+    changeMapHash: string;
+    verificationLedgerHash?: string;
+  };
+  reviewedAreas: ReviewedArea[];
+  findings: BehaviorFinding[];
+  uncoveredContext: UncoveredContext[];
+  assumptions: string[];
+}
+
+export interface ReviewedBehavior {
+  behavior: string;
+  implementationEvidenceRefs: string[];
+  testEvidenceRefs: string[];
+  assessment: "adequately_covered" | "partially_covered" | "not_covered" | "not_applicable" | "needs_context";
+  rationale: string;
+}
+
+export interface TestFinding {
+  id: string;
+  title: string;
+  type: "missing_test" | "missing_failure_path_test" | "weak_assertion" | "test_contract_gap" | "test_execution_gap";
+  candidateImpact: "material" | "advisory" | "needs_context";
+  behavior: string;
+  observedTestCoverage: string;
+  impact: string;
+  recommendation: string;
+  evidenceRefs: string[];
+  confidence: "high" | "medium" | "low";
+}
+
+export interface TestReview {
+  runId: string;
+  stage: "test-review";
+  createdAt: string;
+  sourceArtifacts: {
+    inputManifestHash: string;
+    changeMapHash: string;
+    behaviorReviewHash: string;
+    verificationLedgerHash?: string;
+  };
+  reviewedBehaviors: ReviewedBehavior[];
+  findings: TestFinding[];
+  verificationAssessment: {
+    testCommandStatus: "passed" | "failed" | "not_required" | "unavailable";
+    note: string;
+  };
   uncoveredContext: UncoveredContext[];
   assumptions: string[];
 }

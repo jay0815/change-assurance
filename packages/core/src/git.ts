@@ -70,6 +70,19 @@ export function getBaseCommit(base: string): string {
   return git(["rev-parse", base]);
 }
 
+export function getFileContentAtCommit(commit: string, path: string): string {
+  return git(["show", `${commit}:${path}`]);
+}
+
+export function fileExistsAtCommit(commit: string, path: string): boolean {
+  try {
+    git(["cat-file", "-e", `${commit}:${path}`]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function collectGitState(base: string, head: string): GitState {
   return {
     baseRef: base,
