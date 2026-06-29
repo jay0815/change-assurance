@@ -10,6 +10,7 @@
 **问题**: loadPolicy mock 工作正常，但未验证调用参数。
 
 **改进方案**:
+
 ```typescript
 // 添加调用参数验证
 const { loadPolicy } = await import("../policy.js");
@@ -24,6 +25,7 @@ expect(loadPolicy).toHaveBeenCalledWith(tempDir);
 **问题**: `getChangedFiles` 实现中 status 硬编码为 `'modified'`，但 `ChangedFile` 类型支持 `'added' | 'modified' | 'deleted' | 'renamed'`。
 
 **改进方案**:
+
 - 使用 `git diff --name-status` 获取文件状态
 - 或在测试中添加注释说明这是当前实现行为
 
@@ -35,6 +37,7 @@ expect(loadPolicy).toHaveBeenCalledWith(tempDir);
 **问题**: `collectGitState` 的 dirty working tree 测试未验证 timestamp 格式。
 
 **改进方案**:
+
 ```typescript
 expect(state.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/);
 ```

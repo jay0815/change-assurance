@@ -11,9 +11,7 @@ describe("artifact", () => {
   describe("generateRunId", () => {
     it("should generate a valid UUID", () => {
       const runId = generateRunId();
-      expect(runId).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
-      );
+      expect(runId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     });
 
     it("should generate unique IDs", () => {
@@ -33,9 +31,7 @@ describe("artifact", () => {
   describe("getInputDir", () => {
     it("should return correct input directory path", () => {
       const runId = "test-run-id";
-      expect(getInputDir(runId)).toBe(
-        ".change-assurance/runs/test-run-id/input",
-      );
+      expect(getInputDir(runId)).toBe(".change-assurance/runs/test-run-id/input");
     });
   });
 

@@ -30,17 +30,32 @@ describe("generateLedgers", () => {
   }) {
     const runId = "test-ledger";
     const policy = { version: 1 };
-    const changedFiles = [{ path: "src/index.ts", status: "modified", additions: 10, deletions: 5 }];
-    const gitState = { baseRef: "main", headRef: "HEAD", baseCommit: "base123", headCommit: "abc123", branch: "main", isDirty: false, timestamp: "2024-01-01T00:00:00.000Z" };
+    const changedFiles = [
+      { path: "src/index.ts", status: "modified", additions: 10, deletions: 5 },
+    ];
+    const gitState = {
+      baseRef: "main",
+      headRef: "HEAD",
+      baseCommit: "base123",
+      headCommit: "abc123",
+      branch: "main",
+      isDirty: false,
+      timestamp: "2024-01-01T00:00:00.000Z",
+    };
 
     const policySnapshot = stringify(policy);
     const changedFilesJson = JSON.stringify(changedFiles, null, 2);
     const gitStateJson = JSON.stringify(gitState, null, 2);
 
     const manifest = {
-      runId, baseRef: "main", headRef: "HEAD", createdAt: "2024-01-01T00:00:00.000Z",
-      policySnapshotHash: sha256(policySnapshot), diffHash: sha256("diff"),
-      changedFilesHash: sha256(changedFilesJson), gitStateHash: sha256(gitStateJson),
+      runId,
+      baseRef: "main",
+      headRef: "HEAD",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      policySnapshotHash: sha256(policySnapshot),
+      diffHash: sha256("diff"),
+      changedFilesHash: sha256(changedFilesJson),
+      gitStateHash: sha256(gitStateJson),
     };
 
     const inputDir = join(tempDir, ".change-assurance", "runs", runId, "input");
@@ -56,55 +71,134 @@ describe("generateLedgers", () => {
     writeFileSync(join(inputDir, "policy.snapshot.yaml"), policySnapshot);
 
     const changeMap = {
-      runId, stage: "change-map", createdAt: "2024-01-01T00:00:00.000Z",
-      sourceArtifacts: { inputManifestHash: sha256(policySnapshot), policySnapshotHash: sha256(policySnapshot) },
+      runId,
+      stage: "change-map",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      sourceArtifacts: {
+        inputManifestHash: sha256(policySnapshot),
+        policySnapshotHash: sha256(policySnapshot),
+      },
       changedModules: [{ path: "src/index.ts", role: "entry", changeSummary: "modified" }],
-      behaviorChanges: [], riskAreas: [],
+      behaviorChanges: [],
+      riskAreas: [],
       reviewPriorities: opts?.reviewPriorities ?? [
         { priority: "high", area: "entry logic", reason: "core change" },
       ],
-      uncoveredContext: [], assumptions: [],
+      uncoveredContext: [],
+      assumptions: [],
     };
     const changeMapJsonStr = JSON.stringify(changeMap, null, 2);
     writeFileSync(join(stagesDir, "change-map.json"), changeMapJsonStr);
 
     const brFindings = opts?.behaviorReviewFindings ?? [
-      { id: "B001", title: "Missing null check", type: "failure_path", candidateImpact: "material", trigger: "null", observedBehavior: "throws", impact: "crash", recommendation: "add check", evidenceRefs: ["ref1"], confidence: "high" },
+      {
+        id: "B001",
+        title: "Missing null check",
+        type: "failure_path",
+        candidateImpact: "material",
+        trigger: "null",
+        observedBehavior: "throws",
+        impact: "crash",
+        recommendation: "add check",
+        evidenceRefs: ["ref1"],
+        confidence: "high",
+      },
     ];
     const behaviorReview = {
-      runId, stage: "behavior-review", createdAt: "2024-01-01T00:00:00.000Z",
-      sourceArtifacts: { inputManifestHash: sha256(policySnapshot), changeMapHash: sha256(changeMapJsonStr) },
-      reviewedAreas: [{ area: "entry logic", paths: ["src/index.ts"], focus: "null check", evidenceRefs: ["ref1"] }],
-      findings: brFindings, uncoveredContext: [], assumptions: [],
+      runId,
+      stage: "behavior-review",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      sourceArtifacts: {
+        inputManifestHash: sha256(policySnapshot),
+        changeMapHash: sha256(changeMapJsonStr),
+      },
+      reviewedAreas: [
+        {
+          area: "entry logic",
+          paths: ["src/index.ts"],
+          focus: "null check",
+          evidenceRefs: ["ref1"],
+        },
+      ],
+      findings: brFindings,
+      uncoveredContext: [],
+      assumptions: [],
     };
     writeFileSync(join(stagesDir, "behavior-review.json"), JSON.stringify(behaviorReview, null, 2));
 
     const trFindings = opts?.testReviewFindings ?? [
-      { id: "T001", title: "Missing test", type: "missing_test", candidateImpact: "material", behavior: "null check", observedTestCoverage: "none", impact: "untested", recommendation: "add test", evidenceRefs: ["ref1"], confidence: "high" },
+      {
+        id: "T001",
+        title: "Missing test",
+        type: "missing_test",
+        candidateImpact: "material",
+        behavior: "null check",
+        observedTestCoverage: "none",
+        impact: "untested",
+        recommendation: "add test",
+        evidenceRefs: ["ref1"],
+        confidence: "high",
+      },
     ];
     const behaviorReviewJsonStr = JSON.stringify(behaviorReview, null, 2);
     const testReview = {
-      runId, stage: "test-review", createdAt: "2024-01-01T00:00:00.000Z",
+      runId,
+      stage: "test-review",
+      createdAt: "2024-01-01T00:00:00.000Z",
       sourceArtifacts: {
-        inputManifestHash: sha256(policySnapshot), changeMapHash: sha256(changeMapJsonStr),
+        inputManifestHash: sha256(policySnapshot),
+        changeMapHash: sha256(changeMapJsonStr),
         behaviorReviewHash: sha256(behaviorReviewJsonStr),
       },
-      reviewedBehaviors: [{ behavior: "null check", implementationEvidenceRefs: ["ref1"], testEvidenceRefs: [], assessment: "not_covered", rationale: "no test" }],
+      reviewedBehaviors: [
+        {
+          behavior: "null check",
+          implementationEvidenceRefs: ["ref1"],
+          testEvidenceRefs: [],
+          assessment: "not_covered",
+          rationale: "no test",
+        },
+      ],
       findings: trFindings,
       verificationAssessment: { testCommandStatus: "unavailable", note: "no ledger" },
-      uncoveredContext: [], assumptions: [],
+      uncoveredContext: [],
+      assumptions: [],
     };
     const testReviewJsonStr = JSON.stringify(testReview, null, 2);
     writeFileSync(join(stagesDir, "test-review.json"), testReviewJsonStr);
 
     const auditFindings = opts?.evidenceAuditFindings ?? [
-      { sourceFindingRef: "B001", sourceStage: "behavior-review", disposition: "accepted", evidenceClass: "observed", effectiveCandidateImpact: "material", rationale: "verified", verifiedEvidenceRefs: ["ref1"], missingEvidence: [], missingContext: [] },
-      { sourceFindingRef: "T001", sourceStage: "test-review", disposition: "accepted", evidenceClass: "observed", effectiveCandidateImpact: "material", rationale: "verified", verifiedEvidenceRefs: ["ref1"], missingEvidence: [], missingContext: [], deduplicatedWith: "B001" },
+      {
+        sourceFindingRef: "B001",
+        sourceStage: "behavior-review",
+        disposition: "accepted",
+        evidenceClass: "observed",
+        effectiveCandidateImpact: "material",
+        rationale: "verified",
+        verifiedEvidenceRefs: ["ref1"],
+        missingEvidence: [],
+        missingContext: [],
+      },
+      {
+        sourceFindingRef: "T001",
+        sourceStage: "test-review",
+        disposition: "accepted",
+        evidenceClass: "observed",
+        effectiveCandidateImpact: "material",
+        rationale: "verified",
+        verifiedEvidenceRefs: ["ref1"],
+        missingEvidence: [],
+        missingContext: [],
+        deduplicatedWith: "B001",
+      },
     ];
     const evidenceAudit = {
-      runId, stage: "evidence-audit", createdAt: "2024-01-01T00:00:00.000Z",
+      runId,
+      stage: "evidence-audit",
+      createdAt: "2024-01-01T00:00:00.000Z",
       sourceArtifacts: {
-        inputManifestHash: sha256(policySnapshot), changeMapHash: sha256(changeMapJsonStr),
+        inputManifestHash: sha256(policySnapshot),
+        changeMapHash: sha256(changeMapJsonStr),
         behaviorReviewHash: sha256(behaviorReviewJsonStr),
         testReviewHash: sha256(testReviewJsonStr),
       },
@@ -116,7 +210,10 @@ describe("generateLedgers", () => {
 
     if (opts?.verificationLedger) {
       mkdirSync(verificationDir, { recursive: true });
-      writeFileSync(join(verificationDir, "verification-ledger.json"), JSON.stringify(opts.verificationLedger, null, 2));
+      writeFileSync(
+        join(verificationDir, "verification-ledger.json"),
+        JSON.stringify(opts.verificationLedger, null, 2),
+      );
     }
 
     return { runId };
@@ -140,7 +237,17 @@ describe("generateLedgers", () => {
   it("should not include rejected finding in issue ledger", () => {
     const { runId } = createLedgerFixture({
       evidenceAuditFindings: [
-        { sourceFindingRef: "B001", sourceStage: "behavior-review", disposition: "rejected", evidenceClass: "hypothesis", effectiveCandidateImpact: null, rationale: "insufficient", verifiedEvidenceRefs: [], missingEvidence: ["proof"], missingContext: [] },
+        {
+          sourceFindingRef: "B001",
+          sourceStage: "behavior-review",
+          disposition: "rejected",
+          evidenceClass: "hypothesis",
+          effectiveCandidateImpact: null,
+          rationale: "insufficient",
+          verifiedEvidenceRefs: [],
+          missingEvidence: ["proof"],
+          missingContext: [],
+        },
       ],
     });
     const cwd = process.cwd();
@@ -158,7 +265,17 @@ describe("generateLedgers", () => {
   it("should not upgrade downgraded finding impact", () => {
     const { runId } = createLedgerFixture({
       evidenceAuditFindings: [
-        { sourceFindingRef: "B001", sourceStage: "behavior-review", disposition: "downgraded", evidenceClass: "derived", effectiveCandidateImpact: "advisory", rationale: "less severe", verifiedEvidenceRefs: ["ref1"], missingEvidence: [], missingContext: [] },
+        {
+          sourceFindingRef: "B001",
+          sourceStage: "behavior-review",
+          disposition: "downgraded",
+          evidenceClass: "derived",
+          effectiveCandidateImpact: "advisory",
+          rationale: "less severe",
+          verifiedEvidenceRefs: ["ref1"],
+          missingEvidence: [],
+          missingContext: [],
+        },
       ],
     });
     const cwd = process.cwd();
@@ -193,7 +310,17 @@ describe("generateLedgers", () => {
   it("should use verifiedEvidenceRefs from audit, not source finding refs", () => {
     const { runId } = createLedgerFixture({
       evidenceAuditFindings: [
-        { sourceFindingRef: "B001", sourceStage: "behavior-review", disposition: "accepted", evidenceClass: "observed", effectiveCandidateImpact: "material", rationale: "verified", verifiedEvidenceRefs: ["ref1"], missingEvidence: [], missingContext: [] },
+        {
+          sourceFindingRef: "B001",
+          sourceStage: "behavior-review",
+          disposition: "accepted",
+          evidenceClass: "observed",
+          effectiveCandidateImpact: "material",
+          rationale: "verified",
+          verifiedEvidenceRefs: ["ref1"],
+          missingEvidence: [],
+          missingContext: [],
+        },
       ],
     });
     const cwd = process.cwd();
@@ -226,8 +353,11 @@ describe("generateLedgers", () => {
   it("should archive passed verification command as tool_verified, not reviewed", () => {
     const { runId } = createLedgerFixture({
       verificationLedger: {
-        runId: "test-ledger", createdAt: "2024-01-01T00:00:00.000Z",
-        runStatus: "completed", policySnapshotHash: "test", preconditionErrors: [],
+        runId: "test-ledger",
+        createdAt: "2024-01-01T00:00:00.000Z",
+        runStatus: "completed",
+        policySnapshotHash: "test",
+        preconditionErrors: [],
         commands: [{ id: "test", argv: ["pnpm", "test"], required: true, status: "passed" }],
         summary: { passed: 1, failed: 0, skipped: 0, notRequired: 0 },
         workspaceChangedAfterVerify: false,
@@ -274,7 +404,17 @@ describe("generateLedgers", () => {
   it("should mark needs_context when evidence audit has missing context", () => {
     const { runId } = createLedgerFixture({
       evidenceAuditFindings: [
-        { sourceFindingRef: "B001", sourceStage: "behavior-review", disposition: "needs_context", evidenceClass: "hypothesis", effectiveCandidateImpact: "needs_context", rationale: "missing info", verifiedEvidenceRefs: ["ref1"], missingEvidence: [], missingContext: ["runtime behavior"] },
+        {
+          sourceFindingRef: "B001",
+          sourceStage: "behavior-review",
+          disposition: "needs_context",
+          evidenceClass: "hypothesis",
+          effectiveCandidateImpact: "needs_context",
+          rationale: "missing info",
+          verifiedEvidenceRefs: ["ref1"],
+          missingEvidence: [],
+          missingContext: ["runtime behavior"],
+        },
       ],
     });
     const cwd = process.cwd();
@@ -295,7 +435,14 @@ describe("generateLedgers", () => {
     process.chdir(tempDir);
     try {
       // Tamper with behavior-review.json after audit was created
-      const brPath = join(tempDir, ".change-assurance", "runs", runId, "stages", "behavior-review.json");
+      const brPath = join(
+        tempDir,
+        ".change-assurance",
+        "runs",
+        runId,
+        "stages",
+        "behavior-review.json",
+      );
       writeFileSync(brPath, JSON.stringify({ tampered: true }));
 
       expect(() => generateLedgers({ runId })).toThrow(LedgerError);

@@ -56,13 +56,13 @@ describe("reviewRun", () => {
 
   it("should throw RunError for unsupported engine", async () => {
     await expect(
-      reviewRun({ engine: "other" as any, dryRun: true, adapter: {} as any })
+      reviewRun({ engine: "other" as any, dryRun: true, adapter: {} as any }),
     ).rejects.toThrow("Unsupported engine");
   });
 
   it("should throw RunError when dry-run is false", async () => {
     await expect(
-      reviewRun({ engine: "claude", dryRun: false, adapter: {} as any })
+      reviewRun({ engine: "claude", dryRun: false, adapter: {} as any }),
     ).rejects.toThrow("Only dry-run mode is supported");
   });
 
@@ -70,9 +70,9 @@ describe("reviewRun", () => {
     const adapter = {
       detectCapabilities: () => ({ available: false }),
     };
-    await expect(
-      reviewRun({ engine: "claude", dryRun: true, adapter })
-    ).rejects.toThrow("Claude CLI not available");
+    await expect(reviewRun({ engine: "claude", dryRun: true, adapter })).rejects.toThrow(
+      "Claude CLI not available",
+    );
   });
 
   it("should return failed status when prepare fails", async () => {

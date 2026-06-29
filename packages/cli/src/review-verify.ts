@@ -56,9 +56,7 @@ function shouldExecuteCommand(
     return { required: true, reason: "no when condition specified" };
   }
 
-  const matched = changedFiles.some((f) =>
-    matchesAnyPattern(f.path, command.when!.pathsAny!),
-  );
+  const matched = changedFiles.some((f) => matchesAnyPattern(f.path, command.when!.pathsAny!));
 
   if (matched) {
     return {
@@ -163,10 +161,7 @@ export function reviewVerify(options: VerifyOptions): VerificationLedger {
     const verificationDir = resolve(cwd, getVerificationDir(runId));
     mkdirSync(verificationDir, { recursive: true });
     mkdirSync(resolve(verificationDir, "logs"), { recursive: true });
-    writeFileSync(
-      resolve(cwd, getVerificationLedgerPath(runId)),
-      JSON.stringify(ledger, null, 2),
-    );
+    writeFileSync(resolve(cwd, getVerificationLedgerPath(runId)), JSON.stringify(ledger, null, 2));
 
     return ledger;
   }
@@ -244,10 +239,7 @@ export function reviewVerify(options: VerifyOptions): VerificationLedger {
     workspaceChangedAfterVerify,
   };
 
-  writeFileSync(
-    resolve(cwd, getVerificationLedgerPath(runId)),
-    JSON.stringify(ledger, null, 2),
-  );
+  writeFileSync(resolve(cwd, getVerificationLedgerPath(runId)), JSON.stringify(ledger, null, 2));
 
   return ledger;
 }

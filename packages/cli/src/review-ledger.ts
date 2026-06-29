@@ -106,8 +106,26 @@ export function generateLedgers(input: GenerateLedgersInput): GenerateLedgersOut
   const ledgersDir = resolve(cwd, getLedgersDir(runId));
   mkdirSync(ledgersDir, { recursive: true });
 
-  const issueLedger = buildIssueLedger(runId, evidenceAudit, behaviorReview, testReview, evidenceAuditHash, behaviorReviewHash, testReviewHash);
-  const coverageLedger = buildCoverageLedger(runId, changeMap, behaviorReview, testReview, verificationLedger, changeMapHash, behaviorReviewHash, testReviewHash, verificationLedgerHash);
+  const issueLedger = buildIssueLedger(
+    runId,
+    evidenceAudit,
+    behaviorReview,
+    testReview,
+    evidenceAuditHash,
+    behaviorReviewHash,
+    testReviewHash,
+  );
+  const coverageLedger = buildCoverageLedger(
+    runId,
+    changeMap,
+    behaviorReview,
+    testReview,
+    verificationLedger,
+    changeMapHash,
+    behaviorReviewHash,
+    testReviewHash,
+    verificationLedgerHash,
+  );
 
   // Validate before writing
   validateIssueLedger(issueLedger, evidenceAudit, behaviorReview, testReview);
@@ -153,9 +171,10 @@ function buildIssueLedger(
     if (deduplicatedRefs.has(af.sourceFindingRef)) continue;
 
     // Find the source finding
-    const sourceFinding = af.sourceStage === "behavior-review"
-      ? brFindings.get(af.sourceFindingRef)
-      : trFindings.get(af.sourceFindingRef);
+    const sourceFinding =
+      af.sourceStage === "behavior-review"
+        ? brFindings.get(af.sourceFindingRef)
+        : trFindings.get(af.sourceFindingRef);
 
     if (!sourceFinding) continue;
 
@@ -167,7 +186,11 @@ function buildIssueLedger(
       sourceStage: af.sourceStage,
       status: af.disposition as "accepted" | "downgraded" | "needs_context",
       evidenceClass: af.evidenceClass,
-      candidateImpact: af.effectiveCandidateImpact as "merge_blocking" | "material" | "advisory" | "needs_context",
+      candidateImpact: af.effectiveCandidateImpact as
+        | "merge_blocking"
+        | "material"
+        | "advisory"
+        | "needs_context",
       title: sourceFinding.title,
       summary: af.rationale,
       trigger: "trigger" in sourceFinding ? (sourceFinding as any).trigger : undefined,
@@ -337,13 +360,19 @@ function validateIssueLedger(
   const expectedNeedsContext = ledger.issues.filter((i) => i.status === "needs_context").length;
 
   if (ledger.summary.accepted !== expectedAccepted) {
-    throw new LedgerError(`summary.accepted mismatch: expected ${expectedAccepted}, got ${ledger.summary.accepted}`);
+    throw new LedgerError(
+      `summary.accepted mismatch: expected ${expectedAccepted}, got ${ledger.summary.accepted}`,
+    );
   }
   if (ledger.summary.downgraded !== expectedDowngraded) {
-    throw new LedgerError(`summary.downgraded mismatch: expected ${expectedDowngraded}, got ${ledger.summary.downgraded}`);
+    throw new LedgerError(
+      `summary.downgraded mismatch: expected ${expectedDowngraded}, got ${ledger.summary.downgraded}`,
+    );
   }
   if (ledger.summary.needsContext !== expectedNeedsContext) {
-    throw new LedgerError(`summary.needsContext mismatch: expected ${expectedNeedsContext}, got ${ledger.summary.needsContext}`);
+    throw new LedgerError(
+      `summary.needsContext mismatch: expected ${expectedNeedsContext}, got ${ledger.summary.needsContext}`,
+    );
   }
 }
 
@@ -355,16 +384,24 @@ function validateCoverageLedger(ledger: CoverageLedger, _cm: ChangeMap): void {
   const expectedNeedsContext = ledger.items.filter((i) => i.status === "needs_context").length;
 
   if (ledger.summary.reviewed !== expectedReviewed) {
-    throw new LedgerError(`coverage summary.reviewed mismatch: expected ${expectedReviewed}, got ${ledger.summary.reviewed}`);
+    throw new LedgerError(
+      `coverage summary.reviewed mismatch: expected ${expectedReviewed}, got ${ledger.summary.reviewed}`,
+    );
   }
   if (ledger.summary.toolVerified !== expectedToolVerified) {
-    throw new LedgerError(`coverage summary.toolVerified mismatch: expected ${expectedToolVerified}, got ${ledger.summary.toolVerified}`);
+    throw new LedgerError(
+      `coverage summary.toolVerified mismatch: expected ${expectedToolVerified}, got ${ledger.summary.toolVerified}`,
+    );
   }
   if (ledger.summary.uncovered !== expectedUncovered) {
-    throw new LedgerError(`coverage summary.uncovered mismatch: expected ${expectedUncovered}, got ${ledger.summary.uncovered}`);
+    throw new LedgerError(
+      `coverage summary.uncovered mismatch: expected ${expectedUncovered}, got ${ledger.summary.uncovered}`,
+    );
   }
   if (ledger.summary.needsContext !== expectedNeedsContext) {
-    throw new LedgerError(`coverage summary.needsContext mismatch: expected ${expectedNeedsContext}, got ${ledger.summary.needsContext}`);
+    throw new LedgerError(
+      `coverage summary.needsContext mismatch: expected ${expectedNeedsContext}, got ${ledger.summary.needsContext}`,
+    );
   }
 
   // reviewed must have evidence

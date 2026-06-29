@@ -67,9 +67,7 @@ describe("ClaudeAdapter", () => {
       const mockOutput = JSON.stringify({
         type: "assistant",
         message: {
-          content: [
-            { type: "tool_use", name: "StructuredOutput", input: structuredData },
-          ],
+          content: [{ type: "tool_use", name: "StructuredOutput", input: structuredData }],
         },
       });
 

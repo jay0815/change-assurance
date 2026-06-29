@@ -26,7 +26,11 @@ export function getVerificationLedgerPath(runId: string): string {
   return `${getVerificationDir(runId)}/verification-ledger.json`;
 }
 
-export function getVerificationLogPath(runId: string, commandId: string, stream: "stdout" | "stderr"): string {
+export function getVerificationLogPath(
+  runId: string,
+  commandId: string,
+  stream: "stdout" | "stderr",
+): string {
   return `${getVerificationDir(runId)}/logs/${commandId}.${stream}.log`;
 }
 

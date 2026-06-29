@@ -115,7 +115,9 @@ function validateSourceEvidenceRefs(output: BehaviorReview, expectedCommit: stri
     }
 
     if (parsed.commit !== expectedCommit) {
-      errors.push(`evidenceRef commit mismatch: expected ${expectedCommit}, got ${parsed.commit} in ${ref}`);
+      errors.push(
+        `evidenceRef commit mismatch: expected ${expectedCommit}, got ${parsed.commit} in ${ref}`,
+      );
       continue;
     }
 
@@ -127,7 +129,9 @@ function validateSourceEvidenceRefs(output: BehaviorReview, expectedCommit: stri
     const content = getFileContentAtCommit(parsed.commit, parsed.path);
     const lineCount = content.split("\n").length;
     if (parsed.startLine < 1 || parsed.endLine > lineCount || parsed.startLine > parsed.endLine) {
-      errors.push(`evidenceRef line range invalid: L${parsed.startLine}-L${parsed.endLine} (file has ${lineCount} lines) in ${ref}`);
+      errors.push(
+        `evidenceRef line range invalid: L${parsed.startLine}-L${parsed.endLine} (file has ${lineCount} lines) in ${ref}`,
+      );
     }
   }
 
@@ -138,7 +142,10 @@ function validateTestReviewEvidenceRefs(output: TestReview, expectedCommit: stri
   const errors: string[] = [];
 
   const allRefs = [
-    ...output.reviewedBehaviors.flatMap((rb) => [...(rb.implementationEvidenceRefs ?? []), ...(rb.testEvidenceRefs ?? [])]),
+    ...output.reviewedBehaviors.flatMap((rb) => [
+      ...(rb.implementationEvidenceRefs ?? []),
+      ...(rb.testEvidenceRefs ?? []),
+    ]),
     ...output.findings.flatMap((f) => f.evidenceRefs ?? []),
   ];
 
@@ -150,7 +157,9 @@ function validateTestReviewEvidenceRefs(output: TestReview, expectedCommit: stri
     }
 
     if (parsed.commit !== expectedCommit) {
-      errors.push(`evidenceRef commit mismatch: expected ${expectedCommit}, got ${parsed.commit} in ${ref}`);
+      errors.push(
+        `evidenceRef commit mismatch: expected ${expectedCommit}, got ${parsed.commit} in ${ref}`,
+      );
       continue;
     }
 
@@ -162,7 +171,9 @@ function validateTestReviewEvidenceRefs(output: TestReview, expectedCommit: stri
     const content = getFileContentAtCommit(parsed.commit, parsed.path);
     const lineCount = content.split("\n").length;
     if (parsed.startLine < 1 || parsed.endLine > lineCount || parsed.startLine > parsed.endLine) {
-      errors.push(`evidenceRef line range invalid: L${parsed.startLine}-L${parsed.endLine} (file has ${lineCount} lines) in ${ref}`);
+      errors.push(
+        `evidenceRef line range invalid: L${parsed.startLine}-L${parsed.endLine} (file has ${lineCount} lines) in ${ref}`,
+      );
     }
   }
 
@@ -171,7 +182,15 @@ function validateTestReviewEvidenceRefs(output: TestReview, expectedCommit: stri
 
 function validateBehaviorReviewForbiddenFields(output: any): string[] {
   const errors: string[] = [];
-  const forbiddenFields = ["blocker", "issue", "severity", "blocking", "approve", "mergeRecommendation", "requestChanges"];
+  const forbiddenFields = [
+    "blocker",
+    "issue",
+    "severity",
+    "blocking",
+    "approve",
+    "mergeRecommendation",
+    "requestChanges",
+  ];
   for (const field of forbiddenFields) {
     if (field in output) {
       errors.push(`Forbidden field: ${field}`);
@@ -216,7 +235,15 @@ function validateBehaviorReview(output: BehaviorReview): string[] {
 
 function validateTestReviewForbiddenFields(output: any): string[] {
   const errors: string[] = [];
-  const forbiddenFields = ["blocker", "issue", "severity", "blocking", "approve", "mergeRecommendation", "requestChanges"];
+  const forbiddenFields = [
+    "blocker",
+    "issue",
+    "severity",
+    "blocking",
+    "approve",
+    "mergeRecommendation",
+    "requestChanges",
+  ];
   for (const field of forbiddenFields) {
     if (field in output) {
       errors.push(`Forbidden field: ${field}`);
@@ -230,8 +257,13 @@ function validateTestReview(output: TestReview): string[] {
 
   // Each reviewedBehavior with adequately_covered must have testEvidenceRefs
   for (const rb of output.reviewedBehaviors) {
-    if (rb.assessment === "adequately_covered" && (!rb.testEvidenceRefs || rb.testEvidenceRefs.length === 0)) {
-      errors.push(`reviewedBehavior "${rb.behavior}": adequately_covered requires testEvidenceRefs`);
+    if (
+      rb.assessment === "adequately_covered" &&
+      (!rb.testEvidenceRefs || rb.testEvidenceRefs.length === 0)
+    ) {
+      errors.push(
+        `reviewedBehavior "${rb.behavior}": adequately_covered requires testEvidenceRefs`,
+      );
     }
   }
 
@@ -256,12 +288,16 @@ function validateTestReview(output: TestReview): string[] {
 
 function validateTestReviewVerificationConsistency(
   output: TestReview,
-  verificationLedger?: { commands?: Array<{ id: string; status: string }>; summary?: { failed: number } },
+  verificationLedger?: {
+    commands?: Array<{ id: string; status: string }>;
+    summary?: { failed: number };
+  },
 ): string[] {
   const errors: string[] = [];
   if (!verificationLedger) return errors;
 
-  const hasFailedTests = (verificationLedger.summary?.failed ?? 0) > 0 ||
+  const hasFailedTests =
+    (verificationLedger.summary?.failed ?? 0) > 0 ||
     (verificationLedger.commands ?? []).some((c) => c.status === "failed");
 
   if (hasFailedTests && output.verificationAssessment.testCommandStatus === "passed") {
@@ -274,7 +310,14 @@ function validateTestReviewVerificationConsistency(
 function validateChangeMap(output: any): string[] {
   const errors: string[] = [];
 
-  const forbiddenFields = ["blocker", "issue", "severity", "blocking", "approve", "mergeRecommendation"];
+  const forbiddenFields = [
+    "blocker",
+    "issue",
+    "severity",
+    "blocking",
+    "approve",
+    "mergeRecommendation",
+  ];
   for (const field of forbiddenFields) {
     if (field in output) {
       errors.push(`Forbidden field: ${field}`);
@@ -336,10 +379,11 @@ function validateAdequacy(output: ChangeMap, changedFiles: Array<{ path: string 
 
   if (allAnalysisEmpty) {
     const hasExplanation =
-      (output.assumptions ?? []).length > 0 ||
-      (output.uncoveredContext ?? []).length > 0;
+      (output.assumptions ?? []).length > 0 || (output.uncoveredContext ?? []).length > 0;
     if (!hasExplanation) {
-      errors.push("All analysis arrays are empty but no explanation in assumptions or uncoveredContext");
+      errors.push(
+        "All analysis arrays are empty but no explanation in assumptions or uncoveredContext",
+      );
     }
   }
 
@@ -403,35 +447,74 @@ export async function reviewStage(options: StageOptions): Promise<{ stageArtifac
 
   if (stage === "change-map") {
     return runChangeMapStage({
-      runId, runDir, cwd, adapter, manifest, diffContent, changedFilesContent,
-      policySnapshotContent, verificationLedgerHash, stagesDir, inputManifestHash,
+      runId,
+      runDir,
+      cwd,
+      adapter,
+      manifest,
+      diffContent,
+      changedFilesContent,
+      policySnapshotContent,
+      verificationLedgerHash,
+      stagesDir,
+      inputManifestHash,
     });
   }
 
   if (stage === "behavior-review") {
     return runBehaviorReviewStage({
-      runId, runDir, cwd, adapter, manifest, diffContent, changedFilesContent,
-      gitState, verificationLedgerHash, stagesDir, inputManifestHash,
+      runId,
+      runDir,
+      cwd,
+      adapter,
+      manifest,
+      diffContent,
+      changedFilesContent,
+      gitState,
+      verificationLedgerHash,
+      stagesDir,
+      inputManifestHash,
     });
   }
 
   if (stage === "test-review") {
     return runTestReviewStage({
-      runId, runDir, cwd, adapter, manifest, diffContent, changedFilesContent,
-      gitState, verificationLedgerHash, stagesDir, inputManifestHash,
+      runId,
+      runDir,
+      cwd,
+      adapter,
+      manifest,
+      diffContent,
+      changedFilesContent,
+      gitState,
+      verificationLedgerHash,
+      stagesDir,
+      inputManifestHash,
     });
   }
 
   if (stage === "evidence-audit") {
     return runEvidenceAuditStage({
-      runId, runDir, cwd, adapter, manifest, diffContent, changedFilesContent,
-      gitState, verificationLedgerHash, stagesDir, inputManifestHash,
+      runId,
+      runDir,
+      cwd,
+      adapter,
+      manifest,
+      diffContent,
+      changedFilesContent,
+      gitState,
+      verificationLedgerHash,
+      stagesDir,
+      inputManifestHash,
     });
   }
 
   if (stage === "synthesis") {
     return runSynthesisStage({
-      runId, runDir, cwd, adapter,
+      runId,
+      runDir,
+      cwd,
+      adapter,
     });
   }
 
@@ -439,13 +522,30 @@ export async function reviewStage(options: StageOptions): Promise<{ stageArtifac
 }
 
 async function runChangeMapStage(ctx: {
-  runId: string; runDir: string; cwd: string; adapter: ReviewStageAdapter;
-  manifest: InputManifest; diffContent: string; changedFilesContent: string;
-  policySnapshotContent: string; verificationLedgerHash?: string; stagesDir: string;
+  runId: string;
+  runDir: string;
+  cwd: string;
+  adapter: ReviewStageAdapter;
+  manifest: InputManifest;
+  diffContent: string;
+  changedFilesContent: string;
+  policySnapshotContent: string;
+  verificationLedgerHash?: string;
+  stagesDir: string;
   inputManifestHash: string;
 }): Promise<{ stageArtifactPath: string }> {
-  const { runId, runDir, cwd, adapter, manifest, diffContent, changedFilesContent,
-    policySnapshotContent, verificationLedgerHash, inputManifestHash } = ctx;
+  const {
+    runId,
+    runDir,
+    cwd,
+    adapter,
+    manifest,
+    diffContent,
+    changedFilesContent,
+    policySnapshotContent,
+    verificationLedgerHash,
+    inputManifestHash,
+  } = ctx;
   const stage = "change-map";
 
   const prompt = buildChangeMapPrompt(diffContent, changedFilesContent, policySnapshotContent);
@@ -453,7 +553,12 @@ async function runChangeMapStage(ctx: {
   let rawMessages: unknown;
   let structuredOutput: unknown;
   try {
-    const result = await adapter.runStage({ stage, runDirectory: cwd, prompt, schema: CHANGE_MAP_SCHEMA });
+    const result = await adapter.runStage({
+      stage,
+      runDirectory: cwd,
+      prompt,
+      schema: CHANGE_MAP_SCHEMA,
+    });
     rawMessages = result.rawOutput;
     structuredOutput = result.structuredOutput;
   } catch (error) {
@@ -483,7 +588,9 @@ async function runChangeMapStage(ctx: {
   }
 
   const artifact: ChangeMap = {
-    runId, stage: "change-map", createdAt: new Date().toISOString(),
+    runId,
+    stage: "change-map",
+    createdAt: new Date().toISOString(),
     sourceArtifacts: {
       inputManifestHash,
       policySnapshotHash: manifest.policySnapshotHash,
@@ -503,13 +610,29 @@ async function runChangeMapStage(ctx: {
 }
 
 async function runBehaviorReviewStage(ctx: {
-  runId: string; runDir: string; cwd: string; adapter: ReviewStageAdapter;
-  manifest: InputManifest; diffContent: string; changedFilesContent: string;
-  gitState: { headCommit: string }; verificationLedgerHash?: string; stagesDir: string;
+  runId: string;
+  runDir: string;
+  cwd: string;
+  adapter: ReviewStageAdapter;
+  manifest: InputManifest;
+  diffContent: string;
+  changedFilesContent: string;
+  gitState: { headCommit: string };
+  verificationLedgerHash?: string;
+  stagesDir: string;
   inputManifestHash: string;
 }): Promise<{ stageArtifactPath: string }> {
-  const { runId, cwd, adapter, diffContent, changedFilesContent,
-    gitState, verificationLedgerHash, stagesDir, inputManifestHash } = ctx;
+  const {
+    runId,
+    cwd,
+    adapter,
+    diffContent,
+    changedFilesContent,
+    gitState,
+    verificationLedgerHash,
+    stagesDir,
+    inputManifestHash,
+  } = ctx;
   const stage = "behavior-review";
 
   // Prerequisite: change-map.json must exist and be valid
@@ -525,12 +648,23 @@ async function runBehaviorReviewStage(ctx: {
   const changedFiles = JSON.parse(changedFilesContent) as Array<{ path: string }>;
   const sourceContext = buildSourceContext(changedFiles, gitState.headCommit);
 
-  const prompt = buildBehaviorReviewPrompt(diffContent, changedFilesContent, changeMapContent, gitState.headCommit, sourceContext);
+  const prompt = buildBehaviorReviewPrompt(
+    diffContent,
+    changedFilesContent,
+    changeMapContent,
+    gitState.headCommit,
+    sourceContext,
+  );
 
   let rawMessages: unknown;
   let structuredOutput: unknown;
   try {
-    const result = await adapter.runStage({ stage, runDirectory: cwd, prompt, schema: BEHAVIOR_REVIEW_SCHEMA });
+    const result = await adapter.runStage({
+      stage,
+      runDirectory: cwd,
+      prompt,
+      schema: BEHAVIOR_REVIEW_SCHEMA,
+    });
     rawMessages = result.rawOutput;
     structuredOutput = result.structuredOutput;
   } catch (error) {
@@ -563,7 +697,9 @@ async function runBehaviorReviewStage(ctx: {
   }
 
   const artifact: BehaviorReview = {
-    runId, stage: "behavior-review", createdAt: new Date().toISOString(),
+    runId,
+    stage: "behavior-review",
+    createdAt: new Date().toISOString(),
     sourceArtifacts: {
       inputManifestHash,
       changeMapHash,
@@ -581,13 +717,29 @@ async function runBehaviorReviewStage(ctx: {
 }
 
 async function runTestReviewStage(ctx: {
-  runId: string; runDir: string; cwd: string; adapter: ReviewStageAdapter;
-  manifest: InputManifest; diffContent: string; changedFilesContent: string;
-  gitState: { headCommit: string }; verificationLedgerHash?: string; stagesDir: string;
+  runId: string;
+  runDir: string;
+  cwd: string;
+  adapter: ReviewStageAdapter;
+  manifest: InputManifest;
+  diffContent: string;
+  changedFilesContent: string;
+  gitState: { headCommit: string };
+  verificationLedgerHash?: string;
+  stagesDir: string;
   inputManifestHash: string;
 }): Promise<{ stageArtifactPath: string }> {
-  const { runId, cwd, adapter, diffContent, changedFilesContent,
-    gitState, verificationLedgerHash, stagesDir, inputManifestHash } = ctx;
+  const {
+    runId,
+    cwd,
+    adapter,
+    diffContent,
+    changedFilesContent,
+    gitState,
+    verificationLedgerHash,
+    stagesDir,
+    inputManifestHash,
+  } = ctx;
   const stage = "test-review";
 
   // Prerequisite: change-map.json and behavior-review.json must exist
@@ -618,7 +770,8 @@ async function runTestReviewStage(ctx: {
       .map((c: any) => c.id);
     verificationNote = `- Verification Ledger: status=${verificationLedger.runStatus}, failed=${failedCount}, failedCommands=[${failedCmds.join(", ")}]`;
   } else {
-    verificationNote = "- Verification Ledger: NOT AVAILABLE. Set testCommandStatus to \"unavailable\".";
+    verificationNote =
+      '- Verification Ledger: NOT AVAILABLE. Set testCommandStatus to "unavailable".';
   }
 
   // Build source context
@@ -626,14 +779,24 @@ async function runTestReviewStage(ctx: {
   const sourceContext = buildSourceContext(changedFiles, gitState.headCommit);
 
   const prompt = buildTestReviewPrompt(
-    diffContent, changedFilesContent, changeMapContent, behaviorReviewContent,
-    gitState.headCommit, sourceContext, verificationNote,
+    diffContent,
+    changedFilesContent,
+    changeMapContent,
+    behaviorReviewContent,
+    gitState.headCommit,
+    sourceContext,
+    verificationNote,
   );
 
   let rawMessages: unknown;
   let structuredOutput: unknown;
   try {
-    const result = await adapter.runStage({ stage, runDirectory: cwd, prompt, schema: TEST_REVIEW_SCHEMA });
+    const result = await adapter.runStage({
+      stage,
+      runDirectory: cwd,
+      prompt,
+      schema: TEST_REVIEW_SCHEMA,
+    });
     rawMessages = result.rawOutput;
     structuredOutput = result.structuredOutput;
   } catch (error) {
@@ -671,13 +834,18 @@ async function runTestReviewStage(ctx: {
   }
 
   // Validate verification consistency
-  const consistencyErrors = validateTestReviewVerificationConsistency(testReview, verificationLedger);
+  const consistencyErrors = validateTestReviewVerificationConsistency(
+    testReview,
+    verificationLedger,
+  );
   if (consistencyErrors.length > 0) {
     throw new StageError(`Verification inconsistency: ${consistencyErrors.join(", ")}`);
   }
 
   const artifact: TestReview = {
-    runId, stage: "test-review", createdAt: new Date().toISOString(),
+    runId,
+    stage: "test-review",
+    createdAt: new Date().toISOString(),
     sourceArtifacts: {
       inputManifestHash,
       changeMapHash,
@@ -707,7 +875,15 @@ const IMPACT_RANK: Record<string, number> = {
 
 function validateEvidenceAuditForbiddenFields(output: any): string[] {
   const errors: string[] = [];
-  const forbiddenFields = ["blocker", "issue", "severity", "blocking", "approve", "mergeRecommendation", "requestChanges"];
+  const forbiddenFields = [
+    "blocker",
+    "issue",
+    "severity",
+    "blocking",
+    "approve",
+    "mergeRecommendation",
+    "requestChanges",
+  ];
   for (const field of forbiddenFields) {
     if (field in output) {
       errors.push(`Forbidden field: ${field}`);
@@ -758,9 +934,10 @@ function validateEvidenceAudit(
     }
 
     // Validate verifiedEvidenceRefs are subset of source finding's evidenceRefs
-    const sourceEvidence = af.sourceStage === "behavior-review"
-      ? brEvidenceMap.get(af.sourceFindingRef) ?? new Set<string>()
-      : trEvidenceMap.get(af.sourceFindingRef) ?? new Set<string>();
+    const sourceEvidence =
+      af.sourceStage === "behavior-review"
+        ? (brEvidenceMap.get(af.sourceFindingRef) ?? new Set<string>())
+        : (trEvidenceMap.get(af.sourceFindingRef) ?? new Set<string>());
 
     for (const ref of af.verifiedEvidenceRefs) {
       if (!sourceEvidence.has(ref)) {
@@ -774,21 +951,30 @@ function validateEvidenceAudit(
     }
 
     // effectiveCandidateImpact must not exceed source finding's candidateImpact
-    const sourceImpact = af.sourceStage === "behavior-review"
-      ? brImpactMap.get(af.sourceFindingRef)
-      : trImpactMap.get(af.sourceFindingRef);
+    const sourceImpact =
+      af.sourceStage === "behavior-review"
+        ? brImpactMap.get(af.sourceFindingRef)
+        : trImpactMap.get(af.sourceFindingRef);
 
-    if (sourceImpact && af.effectiveCandidateImpact && af.effectiveCandidateImpact !== "needs_context") {
+    if (
+      sourceImpact &&
+      af.effectiveCandidateImpact &&
+      af.effectiveCandidateImpact !== "needs_context"
+    ) {
       const sourceRank = IMPACT_RANK[sourceImpact] ?? 0;
       const auditRank = IMPACT_RANK[af.effectiveCandidateImpact] ?? 0;
       if (auditRank > sourceRank) {
-        errors.push(`cannot upgrade ${af.sourceFindingRef} from ${sourceImpact} to ${af.effectiveCandidateImpact}`);
+        errors.push(
+          `cannot upgrade ${af.sourceFindingRef} from ${sourceImpact} to ${af.effectiveCandidateImpact}`,
+        );
       }
     }
 
     // rejected must have null effectiveCandidateImpact
     if (af.disposition === "rejected" && af.effectiveCandidateImpact !== null) {
-      errors.push(`rejected finding ${af.sourceFindingRef} must have null effectiveCandidateImpact`);
+      errors.push(
+        `rejected finding ${af.sourceFindingRef} must have null effectiveCandidateImpact`,
+      );
     }
 
     // deduplicatedWith must reference a valid audit finding
@@ -800,7 +986,10 @@ function validateEvidenceAudit(
   }
 
   // Summary must match actual counts
-  const dispositionToKey: Record<string, keyof { accepted: number; downgraded: number; needsContext: number; rejected: number }> = {
+  const dispositionToKey: Record<
+    string,
+    keyof { accepted: number; downgraded: number; needsContext: number; rejected: number }
+  > = {
     accepted: "accepted",
     downgraded: "downgraded",
     needs_context: "needsContext",
@@ -814,17 +1003,25 @@ function validateEvidenceAudit(
     }
   }
   if (counts.accepted !== output.summary.accepted) {
-    errors.push(`summary.accepted mismatch: expected ${counts.accepted}, got ${output.summary.accepted}`);
+    errors.push(
+      `summary.accepted mismatch: expected ${counts.accepted}, got ${output.summary.accepted}`,
+    );
   }
   if (counts.downgraded !== output.summary.downgraded) {
-    errors.push(`summary.downgraded mismatch: expected ${counts.downgraded}, got ${output.summary.downgraded}`);
+    errors.push(
+      `summary.downgraded mismatch: expected ${counts.downgraded}, got ${output.summary.downgraded}`,
+    );
   }
   if (counts.needsContext !== output.summary.needsContext) {
-    errors.push(`summary.needsContext mismatch: expected ${counts.needsContext}, got ${output.summary.needsContext}`);
+    errors.push(
+      `summary.needsContext mismatch: expected ${counts.needsContext}, got ${output.summary.needsContext}`,
+    );
   }
 
   if (counts.rejected !== output.summary.rejected) {
-    errors.push(`summary.rejected mismatch: expected ${counts.rejected}, got ${output.summary.rejected}`);
+    errors.push(
+      `summary.rejected mismatch: expected ${counts.rejected}, got ${output.summary.rejected}`,
+    );
   }
 
   return errors;
@@ -836,12 +1033,18 @@ function buildEvidenceAuditPrompt(
   _headCommit: string,
 ): string {
   // Build per-finding evidence lists for the prompt
-  const brFindingsList = JSON.parse(behaviorReviewJson).findings.map((f: any) =>
-    `  - [${f.id}] ${f.title} (impact: ${f.candidateImpact}, confidence: ${f.confidence})\n    evidenceRefs: ${(f.evidenceRefs ?? []).join(", ")}`,
-  ).join("\n");
-  const trFindingsList = JSON.parse(testReviewJson).findings.map((f: any) =>
-    `  - [${f.id}] ${f.title} (impact: ${f.candidateImpact}, confidence: ${f.confidence})\n    evidenceRefs: ${(f.evidenceRefs ?? []).join(", ")}`,
-  ).join("\n");
+  const brFindingsList = JSON.parse(behaviorReviewJson)
+    .findings.map(
+      (f: any) =>
+        `  - [${f.id}] ${f.title} (impact: ${f.candidateImpact}, confidence: ${f.confidence})\n    evidenceRefs: ${(f.evidenceRefs ?? []).join(", ")}`,
+    )
+    .join("\n");
+  const trFindingsList = JSON.parse(testReviewJson)
+    .findings.map(
+      (f: any) =>
+        `  - [${f.id}] ${f.title} (impact: ${f.candidateImpact}, confidence: ${f.confidence})\n    evidenceRefs: ${(f.evidenceRefs ?? []).join(", ")}`,
+    )
+    .join("\n");
 
   return `You are performing an evidence audit for a code review.
 
@@ -912,12 +1115,20 @@ const EVIDENCE_AUDIT_SCHEMA = {
 };
 
 async function runEvidenceAuditStage(ctx: {
-  runId: string; runDir: string; cwd: string; adapter: ReviewStageAdapter;
-  manifest: InputManifest; diffContent: string; changedFilesContent: string;
-  gitState: { headCommit: string }; verificationLedgerHash?: string; stagesDir: string;
+  runId: string;
+  runDir: string;
+  cwd: string;
+  adapter: ReviewStageAdapter;
+  manifest: InputManifest;
+  diffContent: string;
+  changedFilesContent: string;
+  gitState: { headCommit: string };
+  verificationLedgerHash?: string;
+  stagesDir: string;
   inputManifestHash: string;
 }): Promise<{ stageArtifactPath: string }> {
-  const { runId, cwd, adapter, gitState, verificationLedgerHash, stagesDir, inputManifestHash } = ctx;
+  const { runId, cwd, adapter, gitState, verificationLedgerHash, stagesDir, inputManifestHash } =
+    ctx;
   const stage = "evidence-audit";
 
   // Prerequisites: all three prior stage artifacts must exist
@@ -944,12 +1155,21 @@ async function runEvidenceAuditStage(ctx: {
   const behaviorReview = JSON.parse(behaviorReviewContent) as BehaviorReview;
   const testReview = JSON.parse(testReviewContent) as TestReview;
 
-  const prompt = buildEvidenceAuditPrompt(behaviorReviewContent, testReviewContent, gitState.headCommit);
+  const prompt = buildEvidenceAuditPrompt(
+    behaviorReviewContent,
+    testReviewContent,
+    gitState.headCommit,
+  );
 
   let rawMessages: unknown;
   let structuredOutput: unknown;
   try {
-    const result = await adapter.runStage({ stage, runDirectory: cwd, prompt, schema: EVIDENCE_AUDIT_SCHEMA });
+    const result = await adapter.runStage({
+      stage,
+      runDirectory: cwd,
+      prompt,
+      schema: EVIDENCE_AUDIT_SCHEMA,
+    });
     rawMessages = result.rawOutput;
     structuredOutput = result.structuredOutput;
   } catch (error) {
@@ -976,7 +1196,9 @@ async function runEvidenceAuditStage(ctx: {
   }
 
   const artifact: EvidenceAudit = {
-    runId, stage: "evidence-audit", createdAt: new Date().toISOString(),
+    runId,
+    stage: "evidence-audit",
+    createdAt: new Date().toISOString(),
     sourceArtifacts: {
       inputManifestHash,
       changeMapHash,
@@ -1004,17 +1226,26 @@ function buildSynthesisPrompt(
   verificationLedger: VerificationLedger | undefined,
 ): string {
   // Sort issues: blocking first, then material, then advisory, then needs_context
-  const impactOrder: Record<string, number> = { merge_blocking: 0, material: 1, advisory: 2, needs_context: 3 };
-  const sortedIssues = [...issueLedger.issues]
-    .sort((a, b) => (impactOrder[a.candidateImpact] ?? 99) - (impactOrder[b.candidateImpact] ?? 99));
+  const impactOrder: Record<string, number> = {
+    merge_blocking: 0,
+    material: 1,
+    advisory: 2,
+    needs_context: 3,
+  };
+  const sortedIssues = [...issueLedger.issues].sort(
+    (a, b) => (impactOrder[a.candidateImpact] ?? 99) - (impactOrder[b.candidateImpact] ?? 99),
+  );
 
   // Truncate if too many issues
   const truncatedCount = Math.max(0, sortedIssues.length - MAX_ISSUES_IN_PROMPT);
   const issuesForPrompt = sortedIssues.slice(0, MAX_ISSUES_IN_PROMPT);
 
-  const issuesList = issuesForPrompt.map((i) =>
-    `  - [${i.id}] (${i.candidateImpact}, ${i.status}) ${i.title}\n    summary: ${i.summary}\n    impact: ${i.impact}\n    recommendation: ${i.recommendation}`,
-  ).join("\n");
+  const issuesList = issuesForPrompt
+    .map(
+      (i) =>
+        `  - [${i.id}] (${i.candidateImpact}, ${i.status}) ${i.title}\n    summary: ${i.summary}\n    impact: ${i.impact}\n    recommendation: ${i.recommendation}`,
+    )
+    .join("\n");
 
   const uncoveredList = coverageLedger.items
     .filter((i) => i.status === "uncovered" || i.status === "needs_context")
@@ -1093,7 +1324,14 @@ const SYNTHESIS_SCHEMA = {
     uncoveredSummary: { type: "array" },
     assumptions: { type: "array" },
   },
-  required: ["recommendation", "recommendationRationale", "issueGroups", "verificationSummary", "uncoveredSummary", "assumptions"],
+  required: [
+    "recommendation",
+    "recommendationRationale",
+    "issueGroups",
+    "verificationSummary",
+    "uncoveredSummary",
+    "assumptions",
+  ],
 };
 
 function validateSynthesisForbiddenFields(output: any): string[] {
@@ -1107,7 +1345,11 @@ function validateSynthesisForbiddenFields(output: any): string[] {
   return errors;
 }
 
-function validateSynthesis(output: Synthesis, issueLedger: IssueLedger, verificationLedger: VerificationLedger | undefined): string[] {
+function validateSynthesis(
+  output: Synthesis,
+  issueLedger: IssueLedger,
+  verificationLedger: VerificationLedger | undefined,
+): string[] {
   const errors: string[] = [];
 
   // Build valid issue ID set
@@ -1131,9 +1373,16 @@ function validateSynthesis(output: Synthesis, issueLedger: IssueLedger, verifica
   }
 
   // Validate recommendation is a valid MergeRecommendation value
-  const validRecommendations = ["ready_to_merge", "not_ready_to_merge", "insufficient_evidence", "escalate"];
+  const validRecommendations = [
+    "ready_to_merge",
+    "not_ready_to_merge",
+    "insufficient_evidence",
+    "escalate",
+  ];
   if (!validRecommendations.includes(output.recommendation)) {
-    errors.push(`Invalid recommendation: ${output.recommendation}. Must be one of: ${validRecommendations.join(", ")}`);
+    errors.push(
+      `Invalid recommendation: ${output.recommendation}. Must be one of: ${validRecommendations.join(", ")}`,
+    );
   }
 
   // Validate recommendation against blocking issues
@@ -1154,10 +1403,14 @@ function validateSynthesis(output: Synthesis, issueLedger: IssueLedger, verifica
   if (verificationLedger) {
     const vl = verificationLedger;
     if (output.verificationSummary.passed !== vl.summary.passed) {
-      errors.push(`verificationSummary.passed mismatch: expected ${vl.summary.passed}, got ${output.verificationSummary.passed}`);
+      errors.push(
+        `verificationSummary.passed mismatch: expected ${vl.summary.passed}, got ${output.verificationSummary.passed}`,
+      );
     }
     if (output.verificationSummary.failed !== vl.summary.failed) {
-      errors.push(`verificationSummary.failed mismatch: expected ${vl.summary.failed}, got ${output.verificationSummary.failed}`);
+      errors.push(
+        `verificationSummary.failed mismatch: expected ${vl.summary.failed}, got ${output.verificationSummary.failed}`,
+      );
     }
   }
 
@@ -1165,7 +1418,10 @@ function validateSynthesis(output: Synthesis, issueLedger: IssueLedger, verifica
 }
 
 async function runSynthesisStage(ctx: {
-  runId: string; runDir: string; cwd: string; adapter: ReviewStageAdapter;
+  runId: string;
+  runDir: string;
+  cwd: string;
+  adapter: ReviewStageAdapter;
 }): Promise<{ stageArtifactPath: string }> {
   const { runId, cwd, adapter } = ctx;
   const stage = "synthesis";
@@ -1190,10 +1446,14 @@ async function runSynthesisStage(ctx: {
 
   // Validate ledger belongs to this run
   if (issueLedger.runId !== runId) {
-    throw new StageError(`issue-ledger runId mismatch: expected ${runId}, got ${issueLedger.runId}`);
+    throw new StageError(
+      `issue-ledger runId mismatch: expected ${runId}, got ${issueLedger.runId}`,
+    );
   }
   if (coverageLedger.runId !== runId) {
-    throw new StageError(`coverage-ledger runId mismatch: expected ${runId}, got ${coverageLedger.runId}`);
+    throw new StageError(
+      `coverage-ledger runId mismatch: expected ${runId}, got ${coverageLedger.runId}`,
+    );
   }
 
   const issueLedgerHash = sha256(issueLedgerContent);
@@ -1206,7 +1466,9 @@ async function runSynthesisStage(ctx: {
     const vlContent = readFileSync(verificationLedgerPath, "utf-8");
     verificationLedger = JSON.parse(vlContent) as VerificationLedger;
     if (verificationLedger.runId !== runId) {
-      throw new StageError(`verification-ledger runId mismatch: expected ${runId}, got ${verificationLedger.runId}`);
+      throw new StageError(
+        `verification-ledger runId mismatch: expected ${runId}, got ${verificationLedger.runId}`,
+      );
     }
     verificationLedgerHash = sha256(vlContent);
   }
@@ -1217,7 +1479,12 @@ async function runSynthesisStage(ctx: {
   let rawMessages: unknown;
   let structuredOutput: unknown;
   try {
-    const result = await adapter.runStage({ stage, runDirectory: cwd, prompt, schema: SYNTHESIS_SCHEMA });
+    const result = await adapter.runStage({
+      stage,
+      runDirectory: cwd,
+      prompt,
+      schema: SYNTHESIS_SCHEMA,
+    });
     rawMessages = result.rawOutput;
     structuredOutput = result.structuredOutput;
   } catch (error) {
@@ -1245,9 +1512,15 @@ async function runSynthesisStage(ctx: {
 
   // Build truncated issues assumption if needed
   const assumptions = [...(synthesis.assumptions ?? [])];
-  const impactOrder: Record<string, number> = { merge_blocking: 0, material: 1, advisory: 2, needs_context: 3 };
-  const sortedIssues = [...issueLedger.issues]
-    .sort((a, b) => (impactOrder[a.candidateImpact] ?? 99) - (impactOrder[b.candidateImpact] ?? 99));
+  const impactOrder: Record<string, number> = {
+    merge_blocking: 0,
+    material: 1,
+    advisory: 2,
+    needs_context: 3,
+  };
+  const sortedIssues = [...issueLedger.issues].sort(
+    (a, b) => (impactOrder[a.candidateImpact] ?? 99) - (impactOrder[b.candidateImpact] ?? 99),
+  );
   const truncatedCount = Math.max(0, sortedIssues.length - MAX_ISSUES_IN_PROMPT);
   if (truncatedCount > 0) {
     const truncationNote = `Truncated ${truncatedCount} low-priority advisory issues due to input capacity limits`;
@@ -1257,7 +1530,9 @@ async function runSynthesisStage(ctx: {
   }
 
   const artifact: Synthesis = {
-    runId, stage: "synthesis", createdAt: new Date().toISOString(),
+    runId,
+    stage: "synthesis",
+    createdAt: new Date().toISOString(),
     sourceArtifacts: {
       issueLedgerHash,
       coverageLedgerHash,
@@ -1349,7 +1624,13 @@ const TEST_REVIEW_SCHEMA = {
     uncoveredContext: { type: "array" },
     assumptions: { type: "array" },
   },
-  required: ["reviewedBehaviors", "findings", "verificationAssessment", "uncoveredContext", "assumptions"],
+  required: [
+    "reviewedBehaviors",
+    "findings",
+    "verificationAssessment",
+    "uncoveredContext",
+    "assumptions",
+  ],
 };
 
 const MAX_SOURCE_LINES_PER_FILE = 200;
@@ -1363,11 +1644,17 @@ function buildSourceContext(changedFiles: Array<{ path: string }>, headCommit: s
       const truncated = lines.length > MAX_SOURCE_LINES_PER_FILE;
       const displayLines = truncated ? lines.slice(0, MAX_SOURCE_LINES_PER_FILE) : lines;
       const numbered = displayLines.map((line, i) => `${i + 1}: ${line}`).join("\n");
-      const truncationNote = truncated ? `\n[... truncated: showing ${MAX_SOURCE_LINES_PER_FILE} of ${lines.length} lines]` : "";
-      sections.push(`\n--- SOURCE: git:${headCommit}:${file.path} ---\n${numbered}${truncationNote}\n--- END SOURCE ---`);
+      const truncationNote = truncated
+        ? `\n[... truncated: showing ${MAX_SOURCE_LINES_PER_FILE} of ${lines.length} lines]`
+        : "";
+      sections.push(
+        `\n--- SOURCE: git:${headCommit}:${file.path} ---\n${numbered}${truncationNote}\n--- END SOURCE ---`,
+      );
     } catch {
       // File might not exist at commit (e.g., deleted files)
-      sections.push(`\n--- SOURCE: git:${headCommit}:${file.path} ---\n[File not available at this commit]\n--- END SOURCE ---`);
+      sections.push(
+        `\n--- SOURCE: git:${headCommit}:${file.path} ---\n[File not available at this commit]\n--- END SOURCE ---`,
+      );
     }
   }
   return sections.join("\n");
@@ -1473,5 +1760,12 @@ const CHANGE_MAP_SCHEMA = {
     uncoveredContext: { type: "array" },
     assumptions: { type: "array" },
   },
-  required: ["changedModules", "behaviorChanges", "riskAreas", "reviewPriorities", "uncoveredContext", "assumptions"],
+  required: [
+    "changedModules",
+    "behaviorChanges",
+    "riskAreas",
+    "reviewPriorities",
+    "uncoveredContext",
+    "assumptions",
+  ],
 };

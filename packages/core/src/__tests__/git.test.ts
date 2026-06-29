@@ -29,7 +29,11 @@ describe("git", () => {
     it("should return true when in a git repository", () => {
       mockExecSync.mockReturnValue("true");
       expect(isGitRepository()).toBe(true);
-      expect(mockExecSync).toHaveBeenCalledWith("git", ["rev-parse", "--is-inside-work-tree"], expect.any(Object));
+      expect(mockExecSync).toHaveBeenCalledWith(
+        "git",
+        ["rev-parse", "--is-inside-work-tree"],
+        expect.any(Object),
+      );
     });
 
     it("should return false when not in a git repository", () => {
@@ -44,7 +48,11 @@ describe("git", () => {
     it("should return true when ref exists", () => {
       mockExecSync.mockReturnValue("abc123");
       expect(refExists("main")).toBe(true);
-      expect(mockExecSync).toHaveBeenCalledWith("git", ["rev-parse", "--verify", "main"], expect.any(Object));
+      expect(mockExecSync).toHaveBeenCalledWith(
+        "git",
+        ["rev-parse", "--verify", "main"],
+        expect.any(Object),
+      );
     });
 
     it("should return false when ref does not exist", () => {
@@ -136,7 +144,11 @@ describe("git", () => {
     it("should call git with correct arguments", () => {
       mockExecSync.mockReturnValue("");
       getChangedFiles("base", "head");
-      expect(mockExecSync).toHaveBeenCalledWith("git", ["diff", "--numstat", "base...head"], expect.any(Object));
+      expect(mockExecSync).toHaveBeenCalledWith(
+        "git",
+        ["diff", "--numstat", "base...head"],
+        expect.any(Object),
+      );
     });
   });
 
@@ -153,7 +165,8 @@ describe("git", () => {
       mockExecSync.mockImplementation((_cmd: string, args: string[]) => {
         if (args[0] === "rev-parse" && args[1] === "main") return "base-commit-hash";
         if (args[0] === "rev-parse" && args[1] === "HEAD") return "head-commit-hash";
-        if (args[0] === "rev-parse" && args[1] === "--abbrev-ref" && args[2] === "HEAD") return "main";
+        if (args[0] === "rev-parse" && args[1] === "--abbrev-ref" && args[2] === "HEAD")
+          return "main";
         if (args[0] === "status") return "";
         return "";
       });

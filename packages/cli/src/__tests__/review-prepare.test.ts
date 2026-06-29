@@ -115,19 +115,31 @@ describe("reviewPrepare", () => {
 
       expect(manifest.diffHash).toBe(sha256("diff content"));
       expect(manifest.changedFilesHash).toBe(
-        sha256(JSON.stringify([{ path: "src/file.ts", status: "modified", additions: 10, deletions: 5 }], null, 2)),
+        sha256(
+          JSON.stringify(
+            [{ path: "src/file.ts", status: "modified", additions: 10, deletions: 5 }],
+            null,
+            2,
+          ),
+        ),
       );
       expect(manifest.policySnapshotHash).toBe(sha256(stringify({})));
       expect(manifest.gitStateHash).toBe(
-        sha256(JSON.stringify({
-          baseRef: "main",
-          headRef: "HEAD",
-          baseCommit: "base123",
-          headCommit: "head456",
-          branch: "main",
-          isDirty: false,
-          timestamp: "2024-01-01T00:00:00.000Z",
-        }, null, 2)),
+        sha256(
+          JSON.stringify(
+            {
+              baseRef: "main",
+              headRef: "HEAD",
+              baseCommit: "base123",
+              headCommit: "head456",
+              branch: "main",
+              isDirty: false,
+              timestamp: "2024-01-01T00:00:00.000Z",
+            },
+            null,
+            2,
+          ),
+        ),
       );
     });
   });

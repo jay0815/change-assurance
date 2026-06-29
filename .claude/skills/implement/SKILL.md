@@ -20,6 +20,7 @@ pnpm test -- --filter <package> <test-file>
 ```
 
 The test failure confirms:
+
 - The behavior is not yet implemented
 - The test is actually testing something
 - You have a clear target for implementation

@@ -8,7 +8,8 @@ import { stringify } from "yaml";
 import * as core from "@change-assurance/core";
 
 vi.mock("@change-assurance/core", async () => {
-  const actual = await vi.importActual<typeof import("@change-assurance/core")>("@change-assurance/core");
+  const actual =
+    await vi.importActual<typeof import("@change-assurance/core")>("@change-assurance/core");
   return {
     ...actual,
     getHeadCommit: vi.fn(),
@@ -53,10 +54,17 @@ describe("reviewStage", () => {
   function createRunFixture() {
     const runId = "test-run";
     const policy = { version: 1 };
-    const changedFiles = [{ path: "src/index.ts", status: "modified", additions: 10, deletions: 5 }];
+    const changedFiles = [
+      { path: "src/index.ts", status: "modified", additions: 10, deletions: 5 },
+    ];
     const gitState = {
-      baseRef: "main", headRef: "HEAD", baseCommit: "base123", headCommit: "abc123",
-      branch: "main", isDirty: false, timestamp: "2024-01-01T00:00:00.000Z",
+      baseRef: "main",
+      headRef: "HEAD",
+      baseCommit: "base123",
+      headCommit: "abc123",
+      branch: "main",
+      isDirty: false,
+      timestamp: "2024-01-01T00:00:00.000Z",
     };
 
     const policySnapshot = stringify(policy);
@@ -64,7 +72,10 @@ describe("reviewStage", () => {
     const gitStateJson = JSON.stringify(gitState, null, 2);
 
     const manifest = {
-      runId, baseRef: "main", headRef: "HEAD", createdAt: "2024-01-01T00:00:00.000Z",
+      runId,
+      baseRef: "main",
+      headRef: "HEAD",
+      createdAt: "2024-01-01T00:00:00.000Z",
       policySnapshotHash: sha256(policySnapshot),
       diffHash: sha256("diff content"),
       changedFilesHash: sha256(changedFilesJson),
@@ -90,7 +101,12 @@ describe("reviewStage", () => {
 
   function createFakeAdapter(output: any) {
     return {
-      detectCapabilities: () => ({ available: true, version: "2.1.153", supportsJsonOutput: true, supportsJsonSchema: true }),
+      detectCapabilities: () => ({
+        available: true,
+        version: "2.1.153",
+        supportsJsonOutput: true,
+        supportsJsonSchema: true,
+      }),
       runStage: vi.fn().mockResolvedValue({ rawOutput: output, structuredOutput: output }),
     };
   }
@@ -107,13 +123,19 @@ describe("reviewStage", () => {
     const inputDir = join(tempDir, ".change-assurance", "runs", runId, "input");
     mkdirSync(inputDir, { recursive: true });
 
-    writeFileSync(join(inputDir, "input-manifest.json"), JSON.stringify({
-      runId, baseRef: "main", headRef: "HEAD", createdAt: "2024-01-01T00:00:00.000Z",
-      policySnapshotHash: "wrong-hash",
-      diffHash: sha256("diff"),
-      changedFilesHash: sha256("[]"),
-      gitStateHash: sha256("{}"),
-    }));
+    writeFileSync(
+      join(inputDir, "input-manifest.json"),
+      JSON.stringify({
+        runId,
+        baseRef: "main",
+        headRef: "HEAD",
+        createdAt: "2024-01-01T00:00:00.000Z",
+        policySnapshotHash: "wrong-hash",
+        diffHash: sha256("diff"),
+        changedFilesHash: sha256("[]"),
+        gitStateHash: sha256("{}"),
+      }),
+    );
     writeFileSync(join(inputDir, "diff.patch"), "diff");
     writeFileSync(join(inputDir, "changed-files.json"), "[]");
     writeFileSync(join(inputDir, "git-state.json"), "{}");
@@ -123,9 +145,7 @@ describe("reviewStage", () => {
     mockIsWorkingTreeDirty.mockReturnValue(false);
 
     const adapter = createFakeAdapter({});
-    await expect(
-      reviewStage({ runId, stage: "change-map", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "change-map", adapter })).rejects.toThrow(StageError);
   });
 
   it("should generate change-map.json with valid adapter output", async () => {
@@ -164,9 +184,7 @@ describe("reviewStage", () => {
     };
 
     const adapter = createFakeAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "change-map", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "change-map", adapter })).rejects.toThrow(StageError);
   });
 
   it("should reject output with invalid evidenceRefs", async () => {
@@ -181,23 +199,31 @@ describe("reviewStage", () => {
     };
 
     const adapter = createFakeAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "change-map", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "change-map", adapter })).rejects.toThrow(StageError);
   });
 
   it("should save raw output on adapter failure", async () => {
     const { runId } = createRunFixture();
     const adapter = {
-      detectCapabilities: () => ({ available: true, version: "2.1.153", supportsJsonOutput: true, supportsJsonSchema: true }),
+      detectCapabilities: () => ({
+        available: true,
+        version: "2.1.153",
+        supportsJsonOutput: true,
+        supportsJsonSchema: true,
+      }),
       runStage: vi.fn().mockRejectedValue(new Error("Claude CLI failed")),
     };
 
-    await expect(
-      reviewStage({ runId, stage: "change-map", adapter }),
-    ).rejects.toThrow();
+    await expect(reviewStage({ runId, stage: "change-map", adapter })).rejects.toThrow();
 
-    const rawPath = join(tempDir, ".change-assurance", "runs", runId, "stages", "change-map.raw.json");
+    const rawPath = join(
+      tempDir,
+      ".change-assurance",
+      "runs",
+      runId,
+      "stages",
+      "change-map.raw.json",
+    );
     expect(readFileSync(rawPath, "utf-8")).toContain("error");
   });
 
@@ -215,9 +241,7 @@ describe("reviewStage", () => {
     };
 
     const adapter = createFakeAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "change-map", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "change-map", adapter })).rejects.toThrow(StageError);
   });
 
   it("should reject changedModules referencing unchaged files", async () => {
@@ -232,9 +256,7 @@ describe("reviewStage", () => {
     };
 
     const adapter = createFakeAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "change-map", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "change-map", adapter })).rejects.toThrow(StageError);
   });
 
   it("should reject empty analysis arrays without explanation", async () => {
@@ -249,9 +271,7 @@ describe("reviewStage", () => {
     };
 
     const adapter = createFakeAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "change-map", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "change-map", adapter })).rejects.toThrow(StageError);
   });
 
   it("should accept empty analysis arrays with explanation in assumptions", async () => {
@@ -304,9 +324,7 @@ describe("reviewStage", () => {
     };
 
     const adapter = createFakeAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "change-map", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "change-map", adapter })).rejects.toThrow(StageError);
   });
 });
 
@@ -342,10 +360,17 @@ describe("behavior-review stage", () => {
     const runId = "test-behavior-review";
     const headCommit = "abc123def456";
     const policy = { version: 1 };
-    const changedFiles = [{ path: "src/index.ts", status: "modified", additions: 10, deletions: 5 }];
+    const changedFiles = [
+      { path: "src/index.ts", status: "modified", additions: 10, deletions: 5 },
+    ];
     const gitState = {
-      baseRef: "main", headRef: "HEAD", baseCommit: "base123", headCommit,
-      branch: "main", isDirty: false, timestamp: "2024-01-01T00:00:00.000Z",
+      baseRef: "main",
+      headRef: "HEAD",
+      baseCommit: "base123",
+      headCommit,
+      branch: "main",
+      isDirty: false,
+      timestamp: "2024-01-01T00:00:00.000Z",
     };
 
     const policySnapshot = stringify(policy);
@@ -353,7 +378,10 @@ describe("behavior-review stage", () => {
     const gitStateJson = JSON.stringify(gitState, null, 2);
 
     const manifest = {
-      runId, baseRef: "main", headRef: "HEAD", createdAt: "2024-01-01T00:00:00.000Z",
+      runId,
+      baseRef: "main",
+      headRef: "HEAD",
+      createdAt: "2024-01-01T00:00:00.000Z",
       policySnapshotHash: sha256(policySnapshot),
       diffHash: sha256("diff content"),
       changedFilesHash: sha256(changedFilesJson),
@@ -373,25 +401,40 @@ describe("behavior-review stage", () => {
 
     // Write change-map.json (required prerequisite)
     const changeMap = changeMapOutput ?? {
-      runId, stage: "change-map", createdAt: "2024-01-01T00:00:00.000Z",
-      sourceArtifacts: { inputManifestHash: sha256(policySnapshot), policySnapshotHash: sha256(policySnapshot) },
+      runId,
+      stage: "change-map",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      sourceArtifacts: {
+        inputManifestHash: sha256(policySnapshot),
+        policySnapshotHash: sha256(policySnapshot),
+      },
       changedModules: [{ path: "src/index.ts", role: "entry", changeSummary: "modified" }],
-      behaviorChanges: [], riskAreas: [], reviewPriorities: [],
-      uncoveredContext: [], assumptions: ["test"],
+      behaviorChanges: [],
+      riskAreas: [],
+      reviewPriorities: [],
+      uncoveredContext: [],
+      assumptions: ["test"],
     };
     writeFileSync(join(stagesDir, "change-map.json"), JSON.stringify(changeMap, null, 2));
 
     mockGetHeadCommit.mockReturnValue(headCommit);
     mockIsWorkingTreeDirty.mockReturnValue(false);
     mockFileExistsAtCommit.mockReturnValue(true);
-    mockGetFileContentAtCommit.mockReturnValue(Array(20).fill("function foo() { return 1; }").join("\n"));
+    mockGetFileContentAtCommit.mockReturnValue(
+      Array(20).fill("function foo() { return 1; }").join("\n"),
+    );
 
     return { runId, headCommit };
   }
 
   function createBehaviorReviewAdapter(output: any) {
     return {
-      detectCapabilities: () => ({ available: true, version: "2.1.153", supportsJsonOutput: true, supportsJsonSchema: true }),
+      detectCapabilities: () => ({
+        available: true,
+        version: "2.1.153",
+        supportsJsonOutput: true,
+        supportsJsonSchema: true,
+      }),
       runStage: vi.fn().mockResolvedValue({ rawOutput: output, structuredOutput: output }),
     };
   }
@@ -401,13 +444,23 @@ describe("behavior-review stage", () => {
     const ref = `git:${headCommit}:src/index.ts#L1-L10`;
 
     const adapterOutput = {
-      reviewedAreas: [{ area: "entry", paths: ["src/index.ts"], focus: "core logic", evidenceRefs: [ref] }],
-      findings: [{
-        id: "F001", title: "Missing error handling", type: "failure_path",
-        candidateImpact: "material", trigger: "invalid input", observedBehavior: "throws uncaught",
-        impact: "unhandled exception", recommendation: "add try-catch",
-        evidenceRefs: [ref], confidence: "high",
-      }],
+      reviewedAreas: [
+        { area: "entry", paths: ["src/index.ts"], focus: "core logic", evidenceRefs: [ref] },
+      ],
+      findings: [
+        {
+          id: "F001",
+          title: "Missing error handling",
+          type: "failure_path",
+          candidateImpact: "material",
+          trigger: "invalid input",
+          observedBehavior: "throws uncaught",
+          impact: "unhandled exception",
+          recommendation: "add try-catch",
+          evidenceRefs: [ref],
+          confidence: "high",
+        },
+      ],
       uncoveredContext: [],
       assumptions: ["test"],
     };
@@ -428,40 +481,66 @@ describe("behavior-review stage", () => {
     mockFileExistsAtCommit.mockImplementation((commit: string) => commit === "abc123def456");
 
     const adapterOutput = {
-      reviewedAreas: [{ area: "entry", paths: ["src/index.ts"], focus: "core logic", evidenceRefs: [wrongRef] }],
-      findings: [{
-        id: "F001", title: "test", type: "failure_path", candidateImpact: "material",
-        trigger: "x", observedBehavior: "y", impact: "z", recommendation: "w",
-        evidenceRefs: [wrongRef], confidence: "high",
-      }],
-      uncoveredContext: [], assumptions: [],
+      reviewedAreas: [
+        { area: "entry", paths: ["src/index.ts"], focus: "core logic", evidenceRefs: [wrongRef] },
+      ],
+      findings: [
+        {
+          id: "F001",
+          title: "test",
+          type: "failure_path",
+          candidateImpact: "material",
+          trigger: "x",
+          observedBehavior: "y",
+          impact: "z",
+          recommendation: "w",
+          evidenceRefs: [wrongRef],
+          confidence: "high",
+        },
+      ],
+      uncoveredContext: [],
+      assumptions: [],
     };
 
     const adapter = createBehaviorReviewAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "behavior-review", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "behavior-review", adapter })).rejects.toThrow(
+      StageError,
+    );
   });
 
   it("should reject evidenceRef with non-existent path or out-of-bounds line", async () => {
     const { runId, headCommit } = createBehaviorReviewFixture();
     const ref = `git:${headCommit}:src/nonexistent.ts#L1-L10`;
-    mockFileExistsAtCommit.mockImplementation((_commit: string, path: string) => path === "src/index.ts");
+    mockFileExistsAtCommit.mockImplementation(
+      (_commit: string, path: string) => path === "src/index.ts",
+    );
 
     const adapterOutput = {
-      reviewedAreas: [{ area: "entry", paths: ["src/index.ts"], focus: "core logic", evidenceRefs: [ref] }],
-      findings: [{
-        id: "F001", title: "test", type: "failure_path", candidateImpact: "material",
-        trigger: "x", observedBehavior: "y", impact: "z", recommendation: "w",
-        evidenceRefs: [ref], confidence: "high",
-      }],
-      uncoveredContext: [], assumptions: [],
+      reviewedAreas: [
+        { area: "entry", paths: ["src/index.ts"], focus: "core logic", evidenceRefs: [ref] },
+      ],
+      findings: [
+        {
+          id: "F001",
+          title: "test",
+          type: "failure_path",
+          candidateImpact: "material",
+          trigger: "x",
+          observedBehavior: "y",
+          impact: "z",
+          recommendation: "w",
+          evidenceRefs: [ref],
+          confidence: "high",
+        },
+      ],
+      uncoveredContext: [],
+      assumptions: [],
     };
 
     const adapter = createBehaviorReviewAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "behavior-review", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "behavior-review", adapter })).rejects.toThrow(
+      StageError,
+    );
   });
 
   it("should reject finding missing trigger / impact / recommendation", async () => {
@@ -469,19 +548,31 @@ describe("behavior-review stage", () => {
     const ref = `git:${headCommit}:src/index.ts#L1-L10`;
 
     const adapterOutput = {
-      reviewedAreas: [{ area: "entry", paths: ["src/index.ts"], focus: "core logic", evidenceRefs: [ref] }],
-      findings: [{
-        id: "F001", title: "test", type: "failure_path", candidateImpact: "material",
-        trigger: "", observedBehavior: "y", impact: "", recommendation: "",
-        evidenceRefs: [ref], confidence: "high",
-      }],
-      uncoveredContext: [], assumptions: [],
+      reviewedAreas: [
+        { area: "entry", paths: ["src/index.ts"], focus: "core logic", evidenceRefs: [ref] },
+      ],
+      findings: [
+        {
+          id: "F001",
+          title: "test",
+          type: "failure_path",
+          candidateImpact: "material",
+          trigger: "",
+          observedBehavior: "y",
+          impact: "",
+          recommendation: "",
+          evidenceRefs: [ref],
+          confidence: "high",
+        },
+      ],
+      uncoveredContext: [],
+      assumptions: [],
     };
 
     const adapter = createBehaviorReviewAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "behavior-review", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "behavior-review", adapter })).rejects.toThrow(
+      StageError,
+    );
   });
 
   it("should reject output with merge recommendation or blocker field", async () => {
@@ -489,20 +580,32 @@ describe("behavior-review stage", () => {
     const ref = `git:${headCommit}:src/index.ts#L1-L10`;
 
     const adapterOutput = {
-      reviewedAreas: [{ area: "entry", paths: ["src/index.ts"], focus: "core logic", evidenceRefs: [ref] }],
-      findings: [{
-        id: "F001", title: "test", type: "failure_path", candidateImpact: "material",
-        trigger: "x", observedBehavior: "y", impact: "z", recommendation: "w",
-        evidenceRefs: [ref], confidence: "high",
-      }],
-      uncoveredContext: [], assumptions: [],
+      reviewedAreas: [
+        { area: "entry", paths: ["src/index.ts"], focus: "core logic", evidenceRefs: [ref] },
+      ],
+      findings: [
+        {
+          id: "F001",
+          title: "test",
+          type: "failure_path",
+          candidateImpact: "material",
+          trigger: "x",
+          observedBehavior: "y",
+          impact: "z",
+          recommendation: "w",
+          evidenceRefs: [ref],
+          confidence: "high",
+        },
+      ],
+      uncoveredContext: [],
+      assumptions: [],
       mergeRecommendation: "approve",
     };
 
     const adapter = createBehaviorReviewAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "behavior-review", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "behavior-review", adapter })).rejects.toThrow(
+      StageError,
+    );
   });
 
   it("should not call adapter when change-map is missing", async () => {
@@ -511,10 +614,17 @@ describe("behavior-review stage", () => {
     mkdirSync(inputDir, { recursive: true });
 
     const policy = { version: 1 };
-    const changedFiles = [{ path: "src/index.ts", status: "modified", additions: 10, deletions: 5 }];
+    const changedFiles = [
+      { path: "src/index.ts", status: "modified", additions: 10, deletions: 5 },
+    ];
     const gitState = {
-      baseRef: "main", headRef: "HEAD", baseCommit: "base123", headCommit: "abc123",
-      branch: "main", isDirty: false, timestamp: "2024-01-01T00:00:00.000Z",
+      baseRef: "main",
+      headRef: "HEAD",
+      baseCommit: "base123",
+      headCommit: "abc123",
+      branch: "main",
+      isDirty: false,
+      timestamp: "2024-01-01T00:00:00.000Z",
     };
 
     const policySnapshot = stringify(policy);
@@ -522,7 +632,10 @@ describe("behavior-review stage", () => {
     const gitStateJson = JSON.stringify(gitState, null, 2);
 
     const manifest = {
-      runId, baseRef: "main", headRef: "HEAD", createdAt: "2024-01-01T00:00:00.000Z",
+      runId,
+      baseRef: "main",
+      headRef: "HEAD",
+      createdAt: "2024-01-01T00:00:00.000Z",
       policySnapshotHash: sha256(policySnapshot),
       diffHash: sha256("diff"),
       changedFilesHash: sha256(changedFilesJson),
@@ -541,9 +654,9 @@ describe("behavior-review stage", () => {
     mockIsWorkingTreeDirty.mockReturnValue(false);
 
     const adapter = createBehaviorReviewAdapter({});
-    await expect(
-      reviewStage({ runId, stage: "behavior-review", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "behavior-review", adapter })).rejects.toThrow(
+      StageError,
+    );
     expect(adapter.runStage).not.toHaveBeenCalled();
   });
 
@@ -559,9 +672,9 @@ describe("behavior-review stage", () => {
     };
 
     const adapter = createBehaviorReviewAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "behavior-review", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "behavior-review", adapter })).rejects.toThrow(
+      StageError,
+    );
   });
 
   it("should not be affected by working tree changes since evidence reads from frozen commit", async () => {
@@ -572,13 +685,25 @@ describe("behavior-review stage", () => {
     mockGetFileContentAtCommit.mockReturnValue("function originalCode() {}");
 
     const adapterOutput = {
-      reviewedAreas: [{ area: "entry", paths: ["src/index.ts"], focus: "core logic", evidenceRefs: [ref] }],
-      findings: [{
-        id: "F001", title: "test", type: "regression_risk", candidateImpact: "advisory",
-        trigger: "x", observedBehavior: "y", impact: "z", recommendation: "w",
-        evidenceRefs: [ref], confidence: "medium",
-      }],
-      uncoveredContext: [], assumptions: [],
+      reviewedAreas: [
+        { area: "entry", paths: ["src/index.ts"], focus: "core logic", evidenceRefs: [ref] },
+      ],
+      findings: [
+        {
+          id: "F001",
+          title: "test",
+          type: "regression_risk",
+          candidateImpact: "advisory",
+          trigger: "x",
+          observedBehavior: "y",
+          impact: "z",
+          recommendation: "w",
+          evidenceRefs: [ref],
+          confidence: "medium",
+        },
+      ],
+      uncoveredContext: [],
+      assumptions: [],
     };
 
     const adapter = createBehaviorReviewAdapter(adapterOutput);
@@ -617,14 +742,24 @@ describe("test-review stage", () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  function createTestReviewFixture(opts?: { verificationLedger?: any; behaviorReviewOutput?: any }) {
+  function createTestReviewFixture(opts?: {
+    verificationLedger?: any;
+    behaviorReviewOutput?: any;
+  }) {
     const runId = "test-test-review";
     const headCommit = "abc123def456";
     const policy = { version: 1 };
-    const changedFiles = [{ path: "src/index.ts", status: "modified", additions: 10, deletions: 5 }];
+    const changedFiles = [
+      { path: "src/index.ts", status: "modified", additions: 10, deletions: 5 },
+    ];
     const gitState = {
-      baseRef: "main", headRef: "HEAD", baseCommit: "base123", headCommit,
-      branch: "main", isDirty: false, timestamp: "2024-01-01T00:00:00.000Z",
+      baseRef: "main",
+      headRef: "HEAD",
+      baseCommit: "base123",
+      headCommit,
+      branch: "main",
+      isDirty: false,
+      timestamp: "2024-01-01T00:00:00.000Z",
     };
 
     const policySnapshot = stringify(policy);
@@ -632,7 +767,10 @@ describe("test-review stage", () => {
     const gitStateJson = JSON.stringify(gitState, null, 2);
 
     const manifest = {
-      runId, baseRef: "main", headRef: "HEAD", createdAt: "2024-01-01T00:00:00.000Z",
+      runId,
+      baseRef: "main",
+      headRef: "HEAD",
+      createdAt: "2024-01-01T00:00:00.000Z",
       policySnapshotHash: sha256(policySnapshot),
       diffHash: sha256("diff content"),
       changedFilesHash: sha256(changedFilesJson),
@@ -653,46 +791,85 @@ describe("test-review stage", () => {
 
     // Write change-map.json
     const changeMap = {
-      runId, stage: "change-map", createdAt: "2024-01-01T00:00:00.000Z",
-      sourceArtifacts: { inputManifestHash: sha256(policySnapshot), policySnapshotHash: sha256(policySnapshot) },
+      runId,
+      stage: "change-map",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      sourceArtifacts: {
+        inputManifestHash: sha256(policySnapshot),
+        policySnapshotHash: sha256(policySnapshot),
+      },
       changedModules: [{ path: "src/index.ts", role: "entry", changeSummary: "modified" }],
       behaviorChanges: [{ summary: "added error handling", evidenceRefs: ["input/diff.patch"] }],
-      riskAreas: [], reviewPriorities: [],
-      uncoveredContext: [], assumptions: [],
+      riskAreas: [],
+      reviewPriorities: [],
+      uncoveredContext: [],
+      assumptions: [],
     };
     writeFileSync(join(stagesDir, "change-map.json"), JSON.stringify(changeMap, null, 2));
 
     // Write behavior-review.json
     const behaviorReview = opts?.behaviorReviewOutput ?? {
-      runId, stage: "behavior-review", createdAt: "2024-01-01T00:00:00.000Z",
-      sourceArtifacts: { inputManifestHash: sha256(policySnapshot), changeMapHash: sha256(JSON.stringify(changeMap)) },
-      reviewedAreas: [{ area: "entry", paths: ["src/index.ts"], focus: "error handling", evidenceRefs: [`git:${headCommit}:src/index.ts#L1-L5`] }],
-      findings: [{
-        id: "B001", title: "Missing null check", type: "failure_path", candidateImpact: "material",
-        trigger: "null input", observedBehavior: "throws", impact: "crash", recommendation: "add check",
-        evidenceRefs: [`git:${headCommit}:src/index.ts#L3-L5`], confidence: "high",
-      }],
-      uncoveredContext: [], assumptions: [],
+      runId,
+      stage: "behavior-review",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      sourceArtifacts: {
+        inputManifestHash: sha256(policySnapshot),
+        changeMapHash: sha256(JSON.stringify(changeMap)),
+      },
+      reviewedAreas: [
+        {
+          area: "entry",
+          paths: ["src/index.ts"],
+          focus: "error handling",
+          evidenceRefs: [`git:${headCommit}:src/index.ts#L1-L5`],
+        },
+      ],
+      findings: [
+        {
+          id: "B001",
+          title: "Missing null check",
+          type: "failure_path",
+          candidateImpact: "material",
+          trigger: "null input",
+          observedBehavior: "throws",
+          impact: "crash",
+          recommendation: "add check",
+          evidenceRefs: [`git:${headCommit}:src/index.ts#L3-L5`],
+          confidence: "high",
+        },
+      ],
+      uncoveredContext: [],
+      assumptions: [],
     };
     writeFileSync(join(stagesDir, "behavior-review.json"), JSON.stringify(behaviorReview, null, 2));
 
     // Optionally write verification-ledger.json
     if (opts?.verificationLedger) {
       mkdirSync(verificationDir, { recursive: true });
-      writeFileSync(join(verificationDir, "verification-ledger.json"), JSON.stringify(opts.verificationLedger, null, 2));
+      writeFileSync(
+        join(verificationDir, "verification-ledger.json"),
+        JSON.stringify(opts.verificationLedger, null, 2),
+      );
     }
 
     mockGetHeadCommit.mockReturnValue(headCommit);
     mockIsWorkingTreeDirty.mockReturnValue(false);
     mockFileExistsAtCommit.mockReturnValue(true);
-    mockGetFileContentAtCommit.mockReturnValue(Array(20).fill("function foo() { return 1; }").join("\n"));
+    mockGetFileContentAtCommit.mockReturnValue(
+      Array(20).fill("function foo() { return 1; }").join("\n"),
+    );
 
     return { runId, headCommit };
   }
 
   function createTestReviewAdapter(output: any) {
     return {
-      detectCapabilities: () => ({ available: true, version: "2.1.153", supportsJsonOutput: true, supportsJsonSchema: true }),
+      detectCapabilities: () => ({
+        available: true,
+        version: "2.1.153",
+        supportsJsonOutput: true,
+        supportsJsonSchema: true,
+      }),
       runStage: vi.fn().mockResolvedValue({ rawOutput: output, structuredOutput: output }),
     };
   }
@@ -703,13 +880,15 @@ describe("test-review stage", () => {
     const testRef = `git:${headCommit}:src/__tests__/index.test.ts#L10-L15`;
 
     const adapterOutput = {
-      reviewedBehaviors: [{
-        behavior: "null input handling",
-        implementationEvidenceRefs: [implRef],
-        testEvidenceRefs: [testRef],
-        assessment: "adequately_covered",
-        rationale: "test covers null case",
-      }],
+      reviewedBehaviors: [
+        {
+          behavior: "null input handling",
+          implementationEvidenceRefs: [implRef],
+          testEvidenceRefs: [testRef],
+          assessment: "adequately_covered",
+          rationale: "test covers null case",
+        },
+      ],
       findings: [],
       verificationAssessment: { testCommandStatus: "passed", note: "all tests pass" },
       uncoveredContext: [],
@@ -733,13 +912,15 @@ describe("test-review stage", () => {
     const implRef = `git:${headCommit}:src/index.ts#L3-L5`;
 
     const adapterOutput = {
-      reviewedBehaviors: [{
-        behavior: "null input handling",
-        implementationEvidenceRefs: [implRef],
-        testEvidenceRefs: [],
-        assessment: "adequately_covered",
-        rationale: "trust me",
-      }],
+      reviewedBehaviors: [
+        {
+          behavior: "null input handling",
+          implementationEvidenceRefs: [implRef],
+          testEvidenceRefs: [],
+          assessment: "adequately_covered",
+          rationale: "trust me",
+        },
+      ],
       findings: [],
       verificationAssessment: { testCommandStatus: "passed", note: "ok" },
       uncoveredContext: [],
@@ -747,9 +928,7 @@ describe("test-review stage", () => {
     };
 
     const adapter = createTestReviewAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "test-review", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "test-review", adapter })).rejects.toThrow(StageError);
   });
 
   it("should reject missing_test finding without specific behavior", async () => {
@@ -757,27 +936,36 @@ describe("test-review stage", () => {
     const implRef = `git:${headCommit}:src/index.ts#L3-L5`;
 
     const adapterOutput = {
-      reviewedBehaviors: [{
-        behavior: "null input handling",
-        implementationEvidenceRefs: [implRef],
-        testEvidenceRefs: [],
-        assessment: "not_covered",
-        rationale: "no test found",
-      }],
-      findings: [{
-        id: "T001", title: "test gap", type: "missing_test", candidateImpact: "material",
-        behavior: "", observedTestCoverage: "none", impact: "untested", recommendation: "add test",
-        evidenceRefs: [implRef], confidence: "high",
-      }],
+      reviewedBehaviors: [
+        {
+          behavior: "null input handling",
+          implementationEvidenceRefs: [implRef],
+          testEvidenceRefs: [],
+          assessment: "not_covered",
+          rationale: "no test found",
+        },
+      ],
+      findings: [
+        {
+          id: "T001",
+          title: "test gap",
+          type: "missing_test",
+          candidateImpact: "material",
+          behavior: "",
+          observedTestCoverage: "none",
+          impact: "untested",
+          recommendation: "add test",
+          evidenceRefs: [implRef],
+          confidence: "high",
+        },
+      ],
       verificationAssessment: { testCommandStatus: "passed", note: "ok" },
       uncoveredContext: [],
       assumptions: [],
     };
 
     const adapter = createTestReviewAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "test-review", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "test-review", adapter })).rejects.toThrow(StageError);
   });
 
   it("should reject evidenceRef pointing to wrong commit", async () => {
@@ -786,31 +974,46 @@ describe("test-review stage", () => {
     mockFileExistsAtCommit.mockImplementation((commit: string) => commit === "abc123def456");
 
     const adapterOutput = {
-      reviewedBehaviors: [{
-        behavior: "test", implementationEvidenceRefs: [wrongRef], testEvidenceRefs: [],
-        assessment: "not_covered", rationale: "no test",
-      }],
-      findings: [{
-        id: "T001", title: "gap", type: "missing_test", candidateImpact: "material",
-        behavior: "test", observedTestCoverage: "none", impact: "untested", recommendation: "add test",
-        evidenceRefs: [wrongRef], confidence: "high",
-      }],
+      reviewedBehaviors: [
+        {
+          behavior: "test",
+          implementationEvidenceRefs: [wrongRef],
+          testEvidenceRefs: [],
+          assessment: "not_covered",
+          rationale: "no test",
+        },
+      ],
+      findings: [
+        {
+          id: "T001",
+          title: "gap",
+          type: "missing_test",
+          candidateImpact: "material",
+          behavior: "test",
+          observedTestCoverage: "none",
+          impact: "untested",
+          recommendation: "add test",
+          evidenceRefs: [wrongRef],
+          confidence: "high",
+        },
+      ],
       verificationAssessment: { testCommandStatus: "passed", note: "ok" },
       uncoveredContext: [],
       assumptions: [],
     };
 
     const adapter = createTestReviewAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "test-review", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "test-review", adapter })).rejects.toThrow(StageError);
   });
 
   it("should reject when verification ledger shows failed but model says passed", async () => {
     const { runId, headCommit } = createTestReviewFixture({
       verificationLedger: {
-        runId: "test-test-review", createdAt: "2024-01-01T00:00:00.000Z",
-        runStatus: "completed", policySnapshotHash: "test", preconditionErrors: [],
+        runId: "test-test-review",
+        createdAt: "2024-01-01T00:00:00.000Z",
+        runStatus: "completed",
+        policySnapshotHash: "test",
+        preconditionErrors: [],
         commands: [{ id: "test", argv: ["pnpm", "test"], required: true, status: "failed" }],
         summary: { passed: 0, failed: 1, skipped: 0, notRequired: 0 },
         workspaceChangedAfterVerify: false,
@@ -819,10 +1022,15 @@ describe("test-review stage", () => {
     const implRef = `git:${headCommit}:src/index.ts#L3-L5`;
 
     const adapterOutput = {
-      reviewedBehaviors: [{
-        behavior: "test", implementationEvidenceRefs: [implRef], testEvidenceRefs: [],
-        assessment: "not_covered", rationale: "no test",
-      }],
+      reviewedBehaviors: [
+        {
+          behavior: "test",
+          implementationEvidenceRefs: [implRef],
+          testEvidenceRefs: [],
+          assessment: "not_covered",
+          rationale: "no test",
+        },
+      ],
       findings: [],
       verificationAssessment: { testCommandStatus: "passed", note: "all pass" },
       uncoveredContext: [],
@@ -830,9 +1038,7 @@ describe("test-review stage", () => {
     };
 
     const adapter = createTestReviewAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "test-review", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "test-review", adapter })).rejects.toThrow(StageError);
   });
 
   it("should set testCommandStatus to unavailable when no verification ledger", async () => {
@@ -840,10 +1046,15 @@ describe("test-review stage", () => {
     const implRef = `git:${headCommit}:src/index.ts#L3-L5`;
 
     const adapterOutput = {
-      reviewedBehaviors: [{
-        behavior: "test", implementationEvidenceRefs: [implRef], testEvidenceRefs: [],
-        assessment: "not_covered", rationale: "no test",
-      }],
+      reviewedBehaviors: [
+        {
+          behavior: "test",
+          implementationEvidenceRefs: [implRef],
+          testEvidenceRefs: [],
+          assessment: "not_covered",
+          rationale: "no test",
+        },
+      ],
       findings: [],
       verificationAssessment: { testCommandStatus: "passed", note: "ok" },
       uncoveredContext: [],
@@ -862,10 +1073,15 @@ describe("test-review stage", () => {
     const implRef = `git:${headCommit}:src/index.ts#L3-L5`;
 
     const adapterOutput = {
-      reviewedBehaviors: [{
-        behavior: "test", implementationEvidenceRefs: [implRef], testEvidenceRefs: [],
-        assessment: "not_covered", rationale: "no test",
-      }],
+      reviewedBehaviors: [
+        {
+          behavior: "test",
+          implementationEvidenceRefs: [implRef],
+          testEvidenceRefs: [],
+          assessment: "not_covered",
+          rationale: "no test",
+        },
+      ],
       findings: [],
       verificationAssessment: { testCommandStatus: "unavailable", note: "no ledger" },
       uncoveredContext: [],
@@ -874,22 +1090,27 @@ describe("test-review stage", () => {
     };
 
     const adapter = createTestReviewAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "test-review", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "test-review", adapter })).rejects.toThrow(StageError);
   });
 
   it("should not be affected by working tree changes since evidence reads from frozen commit", async () => {
     const { runId, headCommit } = createTestReviewFixture();
     const implRef = `git:${headCommit}:src/index.ts#L3-L5`;
 
-    mockGetFileContentAtCommit.mockReturnValue(Array(20).fill("function originalCode() {}").join("\n"));
+    mockGetFileContentAtCommit.mockReturnValue(
+      Array(20).fill("function originalCode() {}").join("\n"),
+    );
 
     const adapterOutput = {
-      reviewedBehaviors: [{
-        behavior: "test", implementationEvidenceRefs: [implRef], testEvidenceRefs: [implRef],
-        assessment: "adequately_covered", rationale: "covered",
-      }],
+      reviewedBehaviors: [
+        {
+          behavior: "test",
+          implementationEvidenceRefs: [implRef],
+          testEvidenceRefs: [implRef],
+          assessment: "adequately_covered",
+          rationale: "covered",
+        },
+      ],
       findings: [],
       verificationAssessment: { testCommandStatus: "passed", note: "ok" },
       uncoveredContext: [],
@@ -933,14 +1154,24 @@ describe("evidence-audit stage", () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  function createEvidenceAuditFixture(opts?: { behaviorReviewFindings?: any[]; testReviewFindings?: any[] }) {
+  function createEvidenceAuditFixture(opts?: {
+    behaviorReviewFindings?: any[];
+    testReviewFindings?: any[];
+  }) {
     const runId = "test-evidence-audit";
     const headCommit = "abc123def456";
     const policy = { version: 1 };
-    const changedFiles = [{ path: "src/index.ts", status: "modified", additions: 10, deletions: 5 }];
+    const changedFiles = [
+      { path: "src/index.ts", status: "modified", additions: 10, deletions: 5 },
+    ];
     const gitState = {
-      baseRef: "main", headRef: "HEAD", baseCommit: "base123", headCommit,
-      branch: "main", isDirty: false, timestamp: "2024-01-01T00:00:00.000Z",
+      baseRef: "main",
+      headRef: "HEAD",
+      baseCommit: "base123",
+      headCommit,
+      branch: "main",
+      isDirty: false,
+      timestamp: "2024-01-01T00:00:00.000Z",
     };
 
     const policySnapshot = stringify(policy);
@@ -948,7 +1179,10 @@ describe("evidence-audit stage", () => {
     const gitStateJson = JSON.stringify(gitState, null, 2);
 
     const manifest = {
-      runId, baseRef: "main", headRef: "HEAD", createdAt: "2024-01-01T00:00:00.000Z",
+      runId,
+      baseRef: "main",
+      headRef: "HEAD",
+      createdAt: "2024-01-01T00:00:00.000Z",
       policySnapshotHash: sha256(policySnapshot),
       diffHash: sha256("diff content"),
       changedFilesHash: sha256(changedFilesJson),
@@ -967,59 +1201,115 @@ describe("evidence-audit stage", () => {
     writeFileSync(join(inputDir, "policy.snapshot.yaml"), policySnapshot);
 
     const changeMap = {
-      runId, stage: "change-map", createdAt: "2024-01-01T00:00:00.000Z",
-      sourceArtifacts: { inputManifestHash: sha256(policySnapshot), policySnapshotHash: sha256(policySnapshot) },
+      runId,
+      stage: "change-map",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      sourceArtifacts: {
+        inputManifestHash: sha256(policySnapshot),
+        policySnapshotHash: sha256(policySnapshot),
+      },
       changedModules: [{ path: "src/index.ts", role: "entry", changeSummary: "modified" }],
-      behaviorChanges: [], riskAreas: [], reviewPriorities: [],
-      uncoveredContext: [], assumptions: [],
+      behaviorChanges: [],
+      riskAreas: [],
+      reviewPriorities: [],
+      uncoveredContext: [],
+      assumptions: [],
     };
     writeFileSync(join(stagesDir, "change-map.json"), JSON.stringify(changeMap, null, 2));
 
-    const brFindings = opts?.behaviorReviewFindings ?? [{
-      id: "B001", title: "Missing null check", type: "failure_path", candidateImpact: "material",
-      trigger: "null input", observedBehavior: "throws", impact: "crash", recommendation: "add check",
-      evidenceRefs: [`git:${headCommit}:src/index.ts#L3-L5`], confidence: "high",
-    }];
+    const brFindings = opts?.behaviorReviewFindings ?? [
+      {
+        id: "B001",
+        title: "Missing null check",
+        type: "failure_path",
+        candidateImpact: "material",
+        trigger: "null input",
+        observedBehavior: "throws",
+        impact: "crash",
+        recommendation: "add check",
+        evidenceRefs: [`git:${headCommit}:src/index.ts#L3-L5`],
+        confidence: "high",
+      },
+    ];
     const behaviorReview = {
-      runId, stage: "behavior-review", createdAt: "2024-01-01T00:00:00.000Z",
-      sourceArtifacts: { inputManifestHash: sha256(policySnapshot), changeMapHash: sha256(JSON.stringify(changeMap)) },
-      reviewedAreas: [{ area: "entry", paths: ["src/index.ts"], focus: "core", evidenceRefs: [`git:${headCommit}:src/index.ts#L1-L5`] }],
-      findings: brFindings, uncoveredContext: [], assumptions: [],
+      runId,
+      stage: "behavior-review",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      sourceArtifacts: {
+        inputManifestHash: sha256(policySnapshot),
+        changeMapHash: sha256(JSON.stringify(changeMap)),
+      },
+      reviewedAreas: [
+        {
+          area: "entry",
+          paths: ["src/index.ts"],
+          focus: "core",
+          evidenceRefs: [`git:${headCommit}:src/index.ts#L1-L5`],
+        },
+      ],
+      findings: brFindings,
+      uncoveredContext: [],
+      assumptions: [],
     };
     writeFileSync(join(stagesDir, "behavior-review.json"), JSON.stringify(behaviorReview, null, 2));
 
-    const trFindings = opts?.testReviewFindings ?? [{
-      id: "T001", title: "Missing test for null input", type: "missing_test", candidateImpact: "material",
-      behavior: "null input handling", observedTestCoverage: "none", impact: "untested", recommendation: "add test",
-      evidenceRefs: [`git:${headCommit}:src/index.ts#L3-L5`], confidence: "high",
-    }];
+    const trFindings = opts?.testReviewFindings ?? [
+      {
+        id: "T001",
+        title: "Missing test for null input",
+        type: "missing_test",
+        candidateImpact: "material",
+        behavior: "null input handling",
+        observedTestCoverage: "none",
+        impact: "untested",
+        recommendation: "add test",
+        evidenceRefs: [`git:${headCommit}:src/index.ts#L3-L5`],
+        confidence: "high",
+      },
+    ];
     const testReview = {
-      runId, stage: "test-review", createdAt: "2024-01-01T00:00:00.000Z",
+      runId,
+      stage: "test-review",
+      createdAt: "2024-01-01T00:00:00.000Z",
       sourceArtifacts: {
-        inputManifestHash: sha256(policySnapshot), changeMapHash: sha256(JSON.stringify(changeMap)),
+        inputManifestHash: sha256(policySnapshot),
+        changeMapHash: sha256(JSON.stringify(changeMap)),
         behaviorReviewHash: sha256(JSON.stringify(behaviorReview)),
       },
-      reviewedBehaviors: [{
-        behavior: "null input handling", implementationEvidenceRefs: [`git:${headCommit}:src/index.ts#L3-L5`],
-        testEvidenceRefs: [], assessment: "not_covered", rationale: "no test",
-      }],
+      reviewedBehaviors: [
+        {
+          behavior: "null input handling",
+          implementationEvidenceRefs: [`git:${headCommit}:src/index.ts#L3-L5`],
+          testEvidenceRefs: [],
+          assessment: "not_covered",
+          rationale: "no test",
+        },
+      ],
       findings: trFindings,
       verificationAssessment: { testCommandStatus: "unavailable", note: "no ledger" },
-      uncoveredContext: [], assumptions: [],
+      uncoveredContext: [],
+      assumptions: [],
     };
     writeFileSync(join(stagesDir, "test-review.json"), JSON.stringify(testReview, null, 2));
 
     mockGetHeadCommit.mockReturnValue(headCommit);
     mockIsWorkingTreeDirty.mockReturnValue(false);
     mockFileExistsAtCommit.mockReturnValue(true);
-    mockGetFileContentAtCommit.mockReturnValue(Array(20).fill("function foo() { return 1; }").join("\n"));
+    mockGetFileContentAtCommit.mockReturnValue(
+      Array(20).fill("function foo() { return 1; }").join("\n"),
+    );
 
     return { runId, headCommit };
   }
 
   function createEvidenceAuditAdapter(output: any) {
     return {
-      detectCapabilities: () => ({ available: true, version: "2.1.153", supportsJsonOutput: true, supportsJsonSchema: true }),
+      detectCapabilities: () => ({
+        available: true,
+        version: "2.1.153",
+        supportsJsonOutput: true,
+        supportsJsonSchema: true,
+      }),
       runStage: vi.fn().mockResolvedValue({ rawOutput: output, structuredOutput: output }),
     };
   }
@@ -1029,13 +1319,19 @@ describe("evidence-audit stage", () => {
     const ref = `git:${headCommit}:src/index.ts#L3-L5`;
 
     const adapterOutput = {
-      auditedFindings: [{
-        sourceFindingRef: "B001", sourceStage: "behavior-review",
-        disposition: "accepted", evidenceClass: "observed",
-        effectiveCandidateImpact: "material",
-        rationale: "null check missing, verified in source",
-        verifiedEvidenceRefs: [ref], missingEvidence: [], missingContext: [],
-      }],
+      auditedFindings: [
+        {
+          sourceFindingRef: "B001",
+          sourceStage: "behavior-review",
+          disposition: "accepted",
+          evidenceClass: "observed",
+          effectiveCandidateImpact: "material",
+          rationale: "null check missing, verified in source",
+          verifiedEvidenceRefs: [ref],
+          missingEvidence: [],
+          missingContext: [],
+        },
+      ],
       summary: { accepted: 1, downgraded: 0, needsContext: 0, rejected: 0 },
       assumptions: [],
     };
@@ -1054,43 +1350,54 @@ describe("evidence-audit stage", () => {
     const ref = `git:${headCommit}:src/index.ts#L3-L5`;
 
     const adapterOutput = {
-      auditedFindings: [{
-        sourceFindingRef: "B001", sourceStage: "behavior-review",
-        disposition: "accepted", evidenceClass: "hypothesis",
-        effectiveCandidateImpact: "merge_blocking",
-        rationale: "might be a problem",
-        verifiedEvidenceRefs: [ref], missingEvidence: [], missingContext: [],
-      }],
+      auditedFindings: [
+        {
+          sourceFindingRef: "B001",
+          sourceStage: "behavior-review",
+          disposition: "accepted",
+          evidenceClass: "hypothesis",
+          effectiveCandidateImpact: "merge_blocking",
+          rationale: "might be a problem",
+          verifiedEvidenceRefs: [ref],
+          missingEvidence: [],
+          missingContext: [],
+        },
+      ],
       summary: { accepted: 1, downgraded: 0, needsContext: 0, rejected: 0 },
       assumptions: [],
     };
 
     const adapter = createEvidenceAuditAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "evidence-audit", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "evidence-audit", adapter })).rejects.toThrow(
+      StageError,
+    );
   });
 
   it("should reject audit that adds evidenceRef not in source finding", async () => {
     const { runId } = createEvidenceAuditFixture();
 
     const adapterOutput = {
-      auditedFindings: [{
-        sourceFindingRef: "B001", sourceStage: "behavior-review",
-        disposition: "accepted", evidenceClass: "observed",
-        effectiveCandidateImpact: "material",
-        rationale: "verified",
-        verifiedEvidenceRefs: ["git:abc123def456:src/nonexistent.ts#L1-L2"],
-        missingEvidence: [], missingContext: [],
-      }],
+      auditedFindings: [
+        {
+          sourceFindingRef: "B001",
+          sourceStage: "behavior-review",
+          disposition: "accepted",
+          evidenceClass: "observed",
+          effectiveCandidateImpact: "material",
+          rationale: "verified",
+          verifiedEvidenceRefs: ["git:abc123def456:src/nonexistent.ts#L1-L2"],
+          missingEvidence: [],
+          missingContext: [],
+        },
+      ],
       summary: { accepted: 1, downgraded: 0, needsContext: 0, rejected: 0 },
       assumptions: [],
     };
 
     const adapter = createEvidenceAuditAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "evidence-audit", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "evidence-audit", adapter })).rejects.toThrow(
+      StageError,
+    );
   });
 
   it("should reject audit that upgrades material to merge_blocking", async () => {
@@ -1098,42 +1405,54 @@ describe("evidence-audit stage", () => {
     const ref = `git:${headCommit}:src/index.ts#L3-L5`;
 
     const adapterOutput = {
-      auditedFindings: [{
-        sourceFindingRef: "B001", sourceStage: "behavior-review",
-        disposition: "accepted", evidenceClass: "observed",
-        effectiveCandidateImpact: "merge_blocking",
-        rationale: "critical",
-        verifiedEvidenceRefs: [ref], missingEvidence: [], missingContext: [],
-      }],
+      auditedFindings: [
+        {
+          sourceFindingRef: "B001",
+          sourceStage: "behavior-review",
+          disposition: "accepted",
+          evidenceClass: "observed",
+          effectiveCandidateImpact: "merge_blocking",
+          rationale: "critical",
+          verifiedEvidenceRefs: [ref],
+          missingEvidence: [],
+          missingContext: [],
+        },
+      ],
       summary: { accepted: 1, downgraded: 0, needsContext: 0, rejected: 0 },
       assumptions: [],
     };
 
     const adapter = createEvidenceAuditAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "evidence-audit", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "evidence-audit", adapter })).rejects.toThrow(
+      StageError,
+    );
   });
 
   it("should reject invalid sourceFindingRef", async () => {
     const { runId } = createEvidenceAuditFixture();
 
     const adapterOutput = {
-      auditedFindings: [{
-        sourceFindingRef: "NONEXISTENT", sourceStage: "behavior-review",
-        disposition: "accepted", evidenceClass: "observed",
-        effectiveCandidateImpact: "material",
-        rationale: "verified",
-        verifiedEvidenceRefs: [], missingEvidence: [], missingContext: [],
-      }],
+      auditedFindings: [
+        {
+          sourceFindingRef: "NONEXISTENT",
+          sourceStage: "behavior-review",
+          disposition: "accepted",
+          evidenceClass: "observed",
+          effectiveCandidateImpact: "material",
+          rationale: "verified",
+          verifiedEvidenceRefs: [],
+          missingEvidence: [],
+          missingContext: [],
+        },
+      ],
       summary: { accepted: 1, downgraded: 0, needsContext: 0, rejected: 0 },
       assumptions: [],
     };
 
     const adapter = createEvidenceAuditAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "evidence-audit", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "evidence-audit", adapter })).rejects.toThrow(
+      StageError,
+    );
   });
 
   it("should reject deduplicatedWith pointing to nonexistent finding", async () => {
@@ -1141,43 +1460,55 @@ describe("evidence-audit stage", () => {
     const ref = `git:${headCommit}:src/index.ts#L3-L5`;
 
     const adapterOutput = {
-      auditedFindings: [{
-        sourceFindingRef: "B001", sourceStage: "behavior-review",
-        disposition: "accepted", evidenceClass: "observed",
-        effectiveCandidateImpact: "material",
-        rationale: "verified",
-        verifiedEvidenceRefs: [ref], missingEvidence: [], missingContext: [],
-        deduplicatedWith: "FAKE_ID",
-      }],
+      auditedFindings: [
+        {
+          sourceFindingRef: "B001",
+          sourceStage: "behavior-review",
+          disposition: "accepted",
+          evidenceClass: "observed",
+          effectiveCandidateImpact: "material",
+          rationale: "verified",
+          verifiedEvidenceRefs: [ref],
+          missingEvidence: [],
+          missingContext: [],
+          deduplicatedWith: "FAKE_ID",
+        },
+      ],
       summary: { accepted: 1, downgraded: 0, needsContext: 0, rejected: 0 },
       assumptions: [],
     };
 
     const adapter = createEvidenceAuditAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "evidence-audit", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "evidence-audit", adapter })).rejects.toThrow(
+      StageError,
+    );
   });
 
   it("should reject rejected finding that still has impact", async () => {
     const { runId } = createEvidenceAuditFixture();
 
     const adapterOutput = {
-      auditedFindings: [{
-        sourceFindingRef: "B001", sourceStage: "behavior-review",
-        disposition: "rejected", evidenceClass: "hypothesis",
-        effectiveCandidateImpact: "material",
-        rationale: "insufficient evidence",
-        verifiedEvidenceRefs: [], missingEvidence: ["no proof"], missingContext: [],
-      }],
+      auditedFindings: [
+        {
+          sourceFindingRef: "B001",
+          sourceStage: "behavior-review",
+          disposition: "rejected",
+          evidenceClass: "hypothesis",
+          effectiveCandidateImpact: "material",
+          rationale: "insufficient evidence",
+          verifiedEvidenceRefs: [],
+          missingEvidence: ["no proof"],
+          missingContext: [],
+        },
+      ],
       summary: { accepted: 0, downgraded: 0, needsContext: 0, rejected: 1 },
       assumptions: [],
     };
 
     const adapter = createEvidenceAuditAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "evidence-audit", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "evidence-audit", adapter })).rejects.toThrow(
+      StageError,
+    );
   });
 
   it("should reject summary count mismatch", async () => {
@@ -1185,21 +1516,27 @@ describe("evidence-audit stage", () => {
     const ref = `git:${headCommit}:src/index.ts#L3-L5`;
 
     const adapterOutput = {
-      auditedFindings: [{
-        sourceFindingRef: "B001", sourceStage: "behavior-review",
-        disposition: "accepted", evidenceClass: "observed",
-        effectiveCandidateImpact: "material",
-        rationale: "verified",
-        verifiedEvidenceRefs: [ref], missingEvidence: [], missingContext: [],
-      }],
+      auditedFindings: [
+        {
+          sourceFindingRef: "B001",
+          sourceStage: "behavior-review",
+          disposition: "accepted",
+          evidenceClass: "observed",
+          effectiveCandidateImpact: "material",
+          rationale: "verified",
+          verifiedEvidenceRefs: [ref],
+          missingEvidence: [],
+          missingContext: [],
+        },
+      ],
       summary: { accepted: 2, downgraded: 0, needsContext: 0, rejected: 0 },
       assumptions: [],
     };
 
     const adapter = createEvidenceAuditAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "evidence-audit", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "evidence-audit", adapter })).rejects.toThrow(
+      StageError,
+    );
   });
 
   it("should reject output with merge recommendation or blocker field", async () => {
@@ -1207,21 +1544,27 @@ describe("evidence-audit stage", () => {
     const ref = `git:${headCommit}:src/index.ts#L3-L5`;
 
     const adapterOutput = {
-      auditedFindings: [{
-        sourceFindingRef: "B001", sourceStage: "behavior-review",
-        disposition: "accepted", evidenceClass: "observed",
-        effectiveCandidateImpact: "material",
-        rationale: "verified",
-        verifiedEvidenceRefs: [ref], missingEvidence: [], missingContext: [],
-      }],
+      auditedFindings: [
+        {
+          sourceFindingRef: "B001",
+          sourceStage: "behavior-review",
+          disposition: "accepted",
+          evidenceClass: "observed",
+          effectiveCandidateImpact: "material",
+          rationale: "verified",
+          verifiedEvidenceRefs: [ref],
+          missingEvidence: [],
+          missingContext: [],
+        },
+      ],
       summary: { accepted: 1, downgraded: 0, needsContext: 0, rejected: 0 },
       assumptions: [],
       mergeRecommendation: "approve",
     };
 
     const adapter = createEvidenceAuditAdapter(adapterOutput);
-    await expect(
-      reviewStage({ runId, stage: "evidence-audit", adapter }),
-    ).rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "evidence-audit", adapter })).rejects.toThrow(
+      StageError,
+    );
   });
 });

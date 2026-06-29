@@ -6,12 +6,6 @@
     "rootDir": "src"
   },
   "include": ["src/**/*.ts"],
-  "exclude": [
-    "src/**/__tests__/**",
-    "src/**/*.test.ts",
-    "src/**/*.spec.ts"
-  ],
-  "references": [
-    { "path": "../core/tsconfig.build.json" }
-  ]
+  "exclude": ["src/**/__tests__/**", "src/**/*.test.ts", "src/**/*.spec.ts"],
+  "references": [{ "path": "../core/tsconfig.build.json" }]
 }

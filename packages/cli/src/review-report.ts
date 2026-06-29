@@ -67,7 +67,11 @@ export function reviewReport(input: ReportInput): ReportOutput {
   return generateFullReport(cwd, runId, validation);
 }
 
-function generateDiagnosticReport(cwd: string, runId: string, validation: ValidationResult): ReportOutput {
+function generateDiagnosticReport(
+  cwd: string,
+  runId: string,
+  validation: ValidationResult,
+): ReportOutput {
   const report: ReviewReport = {
     runId,
     createdAt: new Date().toISOString(),
@@ -87,7 +91,11 @@ function generateDiagnosticReport(cwd: string, runId: string, validation: Valida
   return writeReport(cwd, runId, report, md);
 }
 
-function generateFullReport(cwd: string, runId: string, validation: ValidationResult): ReportOutput {
+function generateFullReport(
+  cwd: string,
+  runId: string,
+  validation: ValidationResult,
+): ReportOutput {
   const stagesDir = resolve(cwd, getStagesDir(runId));
   const ledgersDir = resolve(cwd, getLedgersDir(runId));
 
@@ -139,8 +147,19 @@ function generateFullReport(cwd: string, runId: string, validation: ValidationRe
     finalDecision: validation.finalDecision,
     recommendationRationale: synthesis?.recommendationRationale ?? "",
     issues,
-    verificationSummary: synthesis?.verificationSummary ?? { passed: 0, failed: 0, skipped: 0, notRequired: 0, note: "" },
-    coverageSummary: coverageLedger?.summary ?? { reviewed: 0, toolVerified: 0, uncovered: 0, needsContext: 0 },
+    verificationSummary: synthesis?.verificationSummary ?? {
+      passed: 0,
+      failed: 0,
+      skipped: 0,
+      notRequired: 0,
+      note: "",
+    },
+    coverageSummary: coverageLedger?.summary ?? {
+      reviewed: 0,
+      toolVerified: 0,
+      uncovered: 0,
+      needsContext: 0,
+    },
     uncoveredAreas,
     sourceArtifacts: validation.sourceArtifacts,
     errors: validation.errors,
@@ -152,7 +171,12 @@ function generateFullReport(cwd: string, runId: string, validation: ValidationRe
 }
 
 function categorizeIssues(issueLedger: IssueLedger | null): ReviewReport["issues"] {
-  const result: ReviewReport["issues"] = { blocking: [], material: [], advisory: [], needsContext: [] };
+  const result: ReviewReport["issues"] = {
+    blocking: [],
+    material: [],
+    advisory: [],
+    needsContext: [],
+  };
   if (!issueLedger) return result;
 
   for (const issue of issueLedger.issues) {
@@ -204,14 +228,20 @@ function buildDiagnosticMarkdown(validation: ValidationResult): string {
   if (validation.status === "blocked") {
     lines.push("Complete the missing steps in the review pipeline and re-run validate.");
   } else {
-    lines.push("Artifact chain integrity compromised. Re-run prepare, ledger, and synthesis, then validate again.");
+    lines.push(
+      "Artifact chain integrity compromised. Re-run prepare, ledger, and synthesis, then validate again.",
+    );
   }
   lines.push("");
 
   return lines.join("\n");
 }
 
-function buildFullMarkdown(report: ReviewReport, synthesis: Synthesis | null, _issueLedger: IssueLedger | null): string {
+function buildFullMarkdown(
+  report: ReviewReport,
+  synthesis: Synthesis | null,
+  _issueLedger: IssueLedger | null,
+): string {
   const lines: string[] = [];
   lines.push("# Code Review Report");
   lines.push("");
@@ -318,7 +348,12 @@ function buildFullMarkdown(report: ReviewReport, synthesis: Synthesis | null, _i
   return lines.join("\n");
 }
 
-function writeReport(cwd: string, runId: string, report: ReviewReport, markdown: string): ReportOutput {
+function writeReport(
+  cwd: string,
+  runId: string,
+  report: ReviewReport,
+  markdown: string,
+): ReportOutput {
   const reportDir = resolve(cwd, getReportDir(runId));
   mkdirSync(reportDir, { recursive: true });
 

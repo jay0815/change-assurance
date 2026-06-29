@@ -1,9 +1,6 @@
 import { resolve } from "node:path";
 import { mkdirSync, writeFileSync } from "node:fs";
-import {
-  getExecutionDir,
-  getRunSummaryPath,
-} from "@change-assurance/core";
+import { getExecutionDir, getRunSummaryPath } from "@change-assurance/core";
 import { reviewPrepare } from "./review-prepare.js";
 import { reviewVerify } from "./review-verify.js";
 import { reviewStage } from "./review-stage.js";
@@ -11,10 +8,7 @@ import { generateLedgers } from "./review-ledger.js";
 import { reviewValidate } from "./review-validate.js";
 import { reviewReport } from "./review-report.js";
 import { loadPolicy } from "./policy.js";
-import type {
-  VerificationLedger,
-  ValidationResult,
-} from "@change-assurance/core";
+import type { VerificationLedger, ValidationResult } from "@change-assurance/core";
 
 export interface RunOptions {
   base?: string;
@@ -31,11 +25,7 @@ export class RunError extends Error {
   }
 }
 
-export type RunStepStatus =
-  | "passed"
-  | "failed"
-  | "continued_with_findings"
-  | "skipped";
+export type RunStepStatus = "passed" | "failed" | "continued_with_findings" | "skipped";
 
 export type RunStepName =
   | "prepare"
@@ -152,9 +142,17 @@ export async function reviewRun(options: RunOptions): Promise<ReviewRunResult> {
   steps.push(verifyStep);
   try {
     verificationLedger = reviewVerify({ runId });
-    verifyStep.artifactPath = resolve(process.cwd(), ".change-assurance/runs", runId, "verification/verification-ledger.json");
+    verifyStep.artifactPath = resolve(
+      process.cwd(),
+      ".change-assurance/runs",
+      runId,
+      "verification/verification-ledger.json",
+    );
 
-    if (verificationLedger.runStatus === "blocked" || verificationLedger.runStatus === "invalidated") {
+    if (
+      verificationLedger.runStatus === "blocked" ||
+      verificationLedger.runStatus === "invalidated"
+    ) {
       verifyStep.status = "failed";
       verifyStep.endedAt = now();
       verifyStep.message = `Verification ${verificationLedger.runStatus}`;
@@ -276,7 +274,12 @@ export async function reviewRun(options: RunOptions): Promise<ReviewRunResult> {
   steps.push(validateStep);
   try {
     validationResult = reviewValidate({ runId });
-    validateStep.artifactPath = resolve(process.cwd(), ".change-assurance/runs", runId, "validation/validation-result.json");
+    validateStep.artifactPath = resolve(
+      process.cwd(),
+      ".change-assurance/runs",
+      runId,
+      "validation/validation-result.json",
+    );
 
     if (validationResult.status !== "valid") {
       validateStep.status = "failed";
@@ -333,7 +336,9 @@ export async function reviewRun(options: RunOptions): Promise<ReviewRunResult> {
 
   // Determine final decision
   const hasVerificationFailures = verificationLedger!.summary.failed > 0;
-  const finalDecision = hasVerificationFailures ? "not_ready_to_merge" : (validationResult!.finalDecision ?? "ready_to_merge");
+  const finalDecision = hasVerificationFailures
+    ? "not_ready_to_merge"
+    : (validationResult!.finalDecision ?? "ready_to_merge");
 
   return writeRunSummaryAndReturn({
     runId,
@@ -379,10 +384,7 @@ function writeRunSummaryAndReturn(params: {
   if (params.runId !== "unknown") {
     const executionDir = resolve(cwd, getExecutionDir(params.runId));
     mkdirSync(executionDir, { recursive: true });
-    writeFileSync(
-      resolve(cwd, getRunSummaryPath(params.runId)),
-      JSON.stringify(summary, null, 2),
-    );
+    writeFileSync(resolve(cwd, getRunSummaryPath(params.runId)), JSON.stringify(summary, null, 2));
   }
 
   return {
@@ -390,8 +392,6 @@ function writeRunSummaryAndReturn(params: {
     status: params.status,
     finalDecision: params.finalDecision,
     reportPath: params.reportPath,
-    summaryPath: params.runId !== "unknown"
-      ? resolve(cwd, getRunSummaryPath(params.runId))
-      : "",
+    summaryPath: params.runId !== "unknown" ? resolve(cwd, getRunSummaryPath(params.runId)) : "",
   };
 }

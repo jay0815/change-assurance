@@ -9,7 +9,8 @@ import * as core from "@change-assurance/core";
 import { execFileSync } from "node:child_process";
 
 vi.mock("@change-assurance/core", async () => {
-  const actual = await vi.importActual<typeof import("@change-assurance/core")>("@change-assurance/core");
+  const actual =
+    await vi.importActual<typeof import("@change-assurance/core")>("@change-assurance/core");
   return {
     ...actual,
     getHeadCommit: vi.fn(),
@@ -70,10 +71,17 @@ describe("reviewValidate", () => {
     mockIsWorkingTreeDirty.mockReturnValue(opts?.dirtyWorkspace ?? false);
 
     const policy = { version: 1 };
-    const changedFiles = [{ path: "src/index.ts", status: "modified", additions: 10, deletions: 5 }];
+    const changedFiles = [
+      { path: "src/index.ts", status: "modified", additions: 10, deletions: 5 },
+    ];
     const gitState = {
-      baseRef: "main", headRef: "HEAD", baseCommit: "base123", headCommit: "abc123",
-      branch: "main", isDirty: false, timestamp: "2024-01-01T00:00:00.000Z",
+      baseRef: "main",
+      headRef: "HEAD",
+      baseCommit: "base123",
+      headCommit: "abc123",
+      branch: "main",
+      isDirty: false,
+      timestamp: "2024-01-01T00:00:00.000Z",
     };
 
     const policySnapshot = stringify(policy);
@@ -81,7 +89,10 @@ describe("reviewValidate", () => {
     const gitStateJson = JSON.stringify(gitState, null, 2);
 
     const manifest = {
-      runId, baseRef: "main", headRef: "HEAD", createdAt: "2024-01-01T00:00:00.000Z",
+      runId,
+      baseRef: "main",
+      headRef: "HEAD",
+      createdAt: "2024-01-01T00:00:00.000Z",
       policySnapshotHash: sha256(policySnapshot),
       diffHash: sha256("diff content"),
       changedFilesHash: sha256(changedFilesJson),
@@ -106,60 +117,92 @@ describe("reviewValidate", () => {
 
     // Stage artifacts
     const changeMap = {
-      runId, stage: "change-map", createdAt: "2024-01-01T00:00:00.000Z",
-      sourceArtifacts: { inputManifestHash: sha256(manifestJson), policySnapshotHash: sha256(policySnapshot) },
-      changedModules: [], behaviorChanges: [], riskAreas: [],
-      reviewPriorities: [], uncoveredContext: [], assumptions: [],
+      runId,
+      stage: "change-map",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      sourceArtifacts: {
+        inputManifestHash: sha256(manifestJson),
+        policySnapshotHash: sha256(policySnapshot),
+      },
+      changedModules: [],
+      behaviorChanges: [],
+      riskAreas: [],
+      reviewPriorities: [],
+      uncoveredContext: [],
+      assumptions: [],
     };
     const changeMapJson = JSON.stringify(changeMap, null, 2);
     writeFileSync(join(stagesDir, "change-map.json"), changeMapJson);
 
     const behaviorReview = {
-      runId, stage: "behavior-review", createdAt: "2024-01-01T00:00:00.000Z",
+      runId,
+      stage: "behavior-review",
+      createdAt: "2024-01-01T00:00:00.000Z",
       sourceArtifacts: { inputManifestHash: "", changeMapHash: sha256(changeMapJson) },
-      reviewedAreas: [], findings: [], uncoveredContext: [], assumptions: [],
+      reviewedAreas: [],
+      findings: [],
+      uncoveredContext: [],
+      assumptions: [],
     };
     const behaviorReviewJson = JSON.stringify(behaviorReview, null, 2);
     writeFileSync(join(stagesDir, "behavior-review.json"), behaviorReviewJson);
 
     const testReview = {
-      runId, stage: "test-review", createdAt: "2024-01-01T00:00:00.000Z",
-      sourceArtifacts: { inputManifestHash: "", changeMapHash: "", behaviorReviewHash: sha256(behaviorReviewJson) },
-      reviewedBehaviors: [], findings: [],
+      runId,
+      stage: "test-review",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      sourceArtifacts: {
+        inputManifestHash: "",
+        changeMapHash: "",
+        behaviorReviewHash: sha256(behaviorReviewJson),
+      },
+      reviewedBehaviors: [],
+      findings: [],
       verificationAssessment: { testCommandStatus: "unavailable", note: "" },
-      uncoveredContext: [], assumptions: [],
+      uncoveredContext: [],
+      assumptions: [],
     };
     const testReviewJson = JSON.stringify(testReview, null, 2);
     writeFileSync(join(stagesDir, "test-review.json"), testReviewJson);
 
     const evidenceAudit = {
-      runId, stage: "evidence-audit", createdAt: "2024-01-01T00:00:00.000Z",
+      runId,
+      stage: "evidence-audit",
+      createdAt: "2024-01-01T00:00:00.000Z",
       sourceArtifacts: {
-        inputManifestHash: "", changeMapHash: "",
+        inputManifestHash: "",
+        changeMapHash: "",
         behaviorReviewHash: sha256(behaviorReviewJson),
         testReviewHash: sha256(testReviewJson),
       },
-      auditedFindings: [], summary: { accepted: 0, downgraded: 0, needsContext: 0, rejected: 0 }, assumptions: [],
+      auditedFindings: [],
+      summary: { accepted: 0, downgraded: 0, needsContext: 0, rejected: 0 },
+      assumptions: [],
     };
     const evidenceAuditJson = JSON.stringify(evidenceAudit, null, 2);
     writeFileSync(join(stagesDir, "evidence-audit.json"), evidenceAuditJson);
 
     // Verification ledger
     const verificationLedger = {
-      runId, createdAt: "2024-01-01T00:00:00.000Z",
-      runStatus: "completed", policySnapshotHash: sha256(policySnapshot),
+      runId,
+      createdAt: "2024-01-01T00:00:00.000Z",
+      runStatus: "completed",
+      policySnapshotHash: sha256(policySnapshot),
       preconditionErrors: [],
-      commands: [{
-        id: opts?.failedVerification ? "test-fail" : "build",
-        argv: opts?.failedVerification ? ["pnpm", "test"] : ["pnpm", "build"],
-        required: true,
-        status: opts?.failedVerification ? "failed" : "passed",
-        selectionReason: "always",
-      }],
+      commands: [
+        {
+          id: opts?.failedVerification ? "test-fail" : "build",
+          argv: opts?.failedVerification ? ["pnpm", "test"] : ["pnpm", "build"],
+          required: true,
+          status: opts?.failedVerification ? "failed" : "passed",
+          selectionReason: "always",
+        },
+      ],
       summary: {
         passed: opts?.failedVerification ? 0 : 1,
         failed: opts?.failedVerification ? 1 : 0,
-        skipped: 0, notRequired: 0,
+        skipped: 0,
+        notRequired: 0,
       },
       workspaceChangedAfterVerify: false,
     };
@@ -169,14 +212,28 @@ describe("reviewValidate", () => {
 
     if (!opts?.skipLedgers) {
       // Issue ledger
-      const issues = opts?.blockingIssue ? [{
-        id: "issue-br-F001", sourceFindingRef: "F001", sourceStage: "behavior-review",
-        status: "accepted", evidenceClass: "observed", candidateImpact: "merge_blocking",
-        title: "Blocking issue", summary: "test", impact: "test", recommendation: "test",
-        evidenceRefs: [], missingEvidence: [], missingContext: [],
-      }] : [];
+      const issues = opts?.blockingIssue
+        ? [
+            {
+              id: "issue-br-F001",
+              sourceFindingRef: "F001",
+              sourceStage: "behavior-review",
+              status: "accepted",
+              evidenceClass: "observed",
+              candidateImpact: "merge_blocking",
+              title: "Blocking issue",
+              summary: "test",
+              impact: "test",
+              recommendation: "test",
+              evidenceRefs: [],
+              missingEvidence: [],
+              missingContext: [],
+            },
+          ]
+        : [];
       const issueLedger = {
-        runId, createdAt: "2024-01-01T00:00:00.000Z",
+        runId,
+        createdAt: "2024-01-01T00:00:00.000Z",
         sourceArtifacts: {
           evidenceAuditHash: sha256(evidenceAuditJson),
           behaviorReviewHash: sha256(behaviorReviewJson),
@@ -195,7 +252,8 @@ describe("reviewValidate", () => {
 
       // Coverage ledger
       const coverageLedger = {
-        runId, createdAt: "2024-01-01T00:00:00.000Z",
+        runId,
+        createdAt: "2024-01-01T00:00:00.000Z",
         sourceArtifacts: {
           changeMapHash: sha256(changeMapJson),
           behaviorReviewHash: sha256(behaviorReviewJson),
@@ -210,19 +268,25 @@ describe("reviewValidate", () => {
 
       if (!opts?.skipSynthesis) {
         const synthesis = {
-          runId, stage: "synthesis", createdAt: "2024-01-01T00:00:00.000Z",
+          runId,
+          stage: "synthesis",
+          createdAt: "2024-01-01T00:00:00.000Z",
           sourceArtifacts: {
             issueLedgerHash: sha256(issueLedgerJson),
             coverageLedgerHash: sha256(coverageLedgerJson),
             verificationLedgerHash: sha256(verificationLedgerJson),
           },
-          recommendation: opts?.synthesisRecommendation ?? (opts?.blockingIssue ? "not_ready_to_merge" : "ready_to_merge"),
+          recommendation:
+            opts?.synthesisRecommendation ??
+            (opts?.blockingIssue ? "not_ready_to_merge" : "ready_to_merge"),
           recommendationRationale: "test",
           issueGroups: [],
           verificationSummary: {
             passed: opts?.failedVerification ? 0 : 1,
             failed: opts?.failedVerification ? 1 : 0,
-            skipped: 0, notRequired: 0, note: "",
+            skipped: 0,
+            notRequired: 0,
+            note: "",
           },
           uncoveredSummary: [],
           assumptions: [],
@@ -261,12 +325,19 @@ describe("reviewValidate", () => {
     // Re-write behavior-review.json (simulating re-run)
     const stagesDir = join(tempDir, ".change-assurance", "runs", runId, "stages");
     const newBehaviorReview = {
-      runId, stage: "behavior-review", createdAt: "2024-01-02T00:00:00.000Z",
+      runId,
+      stage: "behavior-review",
+      createdAt: "2024-01-02T00:00:00.000Z",
       sourceArtifacts: { inputManifestHash: "", changeMapHash: "" },
       reviewedAreas: [{ area: "new", paths: [], focus: "test", evidenceRefs: [] }],
-      findings: [], uncoveredContext: [], assumptions: [],
+      findings: [],
+      uncoveredContext: [],
+      assumptions: [],
     };
-    writeFileSync(join(stagesDir, "behavior-review.json"), JSON.stringify(newBehaviorReview, null, 2));
+    writeFileSync(
+      join(stagesDir, "behavior-review.json"),
+      JSON.stringify(newBehaviorReview, null, 2),
+    );
 
     const result = reviewValidate({ runId });
 
@@ -279,9 +350,11 @@ describe("reviewValidate", () => {
     // Re-write issue-ledger.json (simulating ledger rebuild)
     const ledgersDir = join(tempDir, ".change-assurance", "runs", runId, "ledgers");
     const newIssueLedger = {
-      runId, createdAt: "2024-01-02T00:00:00.000Z",
+      runId,
+      createdAt: "2024-01-02T00:00:00.000Z",
       sourceArtifacts: { evidenceAuditHash: "", behaviorReviewHash: "", testReviewHash: "" },
-      issues: [], summary: { accepted: 0, downgraded: 0, needsContext: 0, deduplicated: 0 },
+      issues: [],
+      summary: { accepted: 0, downgraded: 0, needsContext: 0, deduplicated: 0 },
     };
     writeFileSync(join(ledgersDir, "issue-ledger.json"), JSON.stringify(newIssueLedger, null, 2));
 
@@ -313,7 +386,9 @@ describe("reviewValidate", () => {
   it("should not report workspace dirty when only .change-assurance/ changed", () => {
     const { runId } = createFullChainFixture({ dirtyWorkspace: true });
     // Mock git status to show only .change-assurance/ changes
-    mockExecFileSync.mockReturnValue(" M .change-assurance/runs/test-validate/stages/synthesis.json\n");
+    mockExecFileSync.mockReturnValue(
+      " M .change-assurance/runs/test-validate/stages/synthesis.json\n",
+    );
 
     const result = reviewValidate({ runId });
 

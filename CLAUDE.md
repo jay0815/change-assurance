@@ -115,6 +115,7 @@ pnpm ca review prepare --base <ref> --head <ref>
 本项目使用 TypeScript Project References 管理包依赖。
 
 **配置结构:**
+
 - `tsconfig.base.json` - 共享编译选项
 - `tsconfig.json` - solution 文件，引用所有包
 - `packages/core/tsconfig.json` - core 包，启用 composite
@@ -122,6 +123,7 @@ pnpm ca review prepare --base <ref> --head <ref>
 - `packages/adapter-claude/tsconfig.json` - adapter 包，引用 core
 
 **构建命令:**
+
 ```bash
 # 增量构建（自动处理依赖顺序）
 tsc -b

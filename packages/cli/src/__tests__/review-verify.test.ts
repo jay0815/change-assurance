@@ -176,8 +176,24 @@ describe("reviewVerify", () => {
     expect(ledger.commands[0].exitCode).toBe(0);
 
     // Verify log files were created
-    const stdoutPath = join(tempDir, ".change-assurance", "runs", runId, "verification", "logs", "typecheck.stdout.log");
-    const stderrPath = join(tempDir, ".change-assurance", "runs", runId, "verification", "logs", "typecheck.stderr.log");
+    const stdoutPath = join(
+      tempDir,
+      ".change-assurance",
+      "runs",
+      runId,
+      "verification",
+      "logs",
+      "typecheck.stdout.log",
+    );
+    const stderrPath = join(
+      tempDir,
+      ".change-assurance",
+      "runs",
+      runId,
+      "verification",
+      "logs",
+      "typecheck.stderr.log",
+    );
     expect(existsSync(stdoutPath)).toBe(true);
     expect(existsSync(stderrPath)).toBe(true);
   });
@@ -200,7 +216,15 @@ describe("reviewVerify", () => {
     expect(ledger.summary.notRequired).toBe(1);
 
     // Verify log files were NOT created
-    const stdoutPath = join(tempDir, ".change-assurance", "runs", runId, "verification", "logs", "typecheck.stdout.log");
+    const stdoutPath = join(
+      tempDir,
+      ".change-assurance",
+      "runs",
+      runId,
+      "verification",
+      "logs",
+      "typecheck.stdout.log",
+    );
     expect(existsSync(stdoutPath)).toBe(false);
   });
 

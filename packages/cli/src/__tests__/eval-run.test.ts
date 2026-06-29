@@ -63,14 +63,14 @@ describe("evalRun", () => {
   });
 
   it("should reject non-claude engine", async () => {
-    await expect(
-      evalRun({ caseId: "test", engine: "other" as any })
-    ).rejects.toThrow("Unsupported engine");
+    await expect(evalRun({ caseId: "test", engine: "other" as any })).rejects.toThrow(
+      "Unsupported engine",
+    );
   });
 
   it("should reject when neither --case nor --all specified", async () => {
-    await expect(
-      evalRun({ engine: "claude" })
-    ).rejects.toThrow("Either --case or --all must be specified");
+    await expect(evalRun({ engine: "claude" })).rejects.toThrow(
+      "Either --case or --all must be specified",
+    );
   });
 });

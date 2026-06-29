@@ -8,7 +8,8 @@ import { stringify } from "yaml";
 import * as core from "@change-assurance/core";
 
 vi.mock("@change-assurance/core", async () => {
-  const actual = await vi.importActual<typeof import("@change-assurance/core")>("@change-assurance/core");
+  const actual =
+    await vi.importActual<typeof import("@change-assurance/core")>("@change-assurance/core");
   return {
     ...actual,
     getHeadCommit: vi.fn(),
@@ -55,10 +56,17 @@ describe("reviewStage - synthesis", () => {
   }) {
     const runId = "test-synthesis";
     const policy = { version: 1 };
-    const changedFiles = [{ path: "src/index.ts", status: "modified", additions: 10, deletions: 5 }];
+    const changedFiles = [
+      { path: "src/index.ts", status: "modified", additions: 10, deletions: 5 },
+    ];
     const gitState = {
-      baseRef: "main", headRef: "HEAD", baseCommit: "base123", headCommit: "abc123",
-      branch: "main", isDirty: false, timestamp: "2024-01-01T00:00:00.000Z",
+      baseRef: "main",
+      headRef: "HEAD",
+      baseCommit: "base123",
+      headCommit: "abc123",
+      branch: "main",
+      isDirty: false,
+      timestamp: "2024-01-01T00:00:00.000Z",
     };
 
     const policySnapshot = stringify(policy);
@@ -66,7 +74,10 @@ describe("reviewStage - synthesis", () => {
     const gitStateJson = JSON.stringify(gitState, null, 2);
 
     const manifest = {
-      runId, baseRef: "main", headRef: "HEAD", createdAt: "2024-01-01T00:00:00.000Z",
+      runId,
+      baseRef: "main",
+      headRef: "HEAD",
+      createdAt: "2024-01-01T00:00:00.000Z",
       policySnapshotHash: sha256(policySnapshot),
       diffHash: sha256("diff content"),
       changedFilesHash: sha256(changedFilesJson),
@@ -89,37 +100,67 @@ describe("reviewStage - synthesis", () => {
 
     // Create prerequisite stage artifacts (empty, just need to exist)
     const changeMap = {
-      runId, stage: "change-map", createdAt: "2024-01-01T00:00:00.000Z",
-      sourceArtifacts: { inputManifestHash: sha256(JSON.stringify(manifest, null, 2)), policySnapshotHash: sha256(policySnapshot) },
-      changedModules: [], behaviorChanges: [], riskAreas: [],
-      reviewPriorities: [], uncoveredContext: [], assumptions: [],
+      runId,
+      stage: "change-map",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      sourceArtifacts: {
+        inputManifestHash: sha256(JSON.stringify(manifest, null, 2)),
+        policySnapshotHash: sha256(policySnapshot),
+      },
+      changedModules: [],
+      behaviorChanges: [],
+      riskAreas: [],
+      reviewPriorities: [],
+      uncoveredContext: [],
+      assumptions: [],
     };
     writeFileSync(join(stagesDir, "change-map.json"), JSON.stringify(changeMap, null, 2));
 
     const behaviorReview = {
-      runId, stage: "behavior-review", createdAt: "2024-01-01T00:00:00.000Z",
-      sourceArtifacts: { inputManifestHash: "", changeMapHash: sha256(JSON.stringify(changeMap, null, 2)) },
-      reviewedAreas: [], findings: [], uncoveredContext: [], assumptions: [],
+      runId,
+      stage: "behavior-review",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      sourceArtifacts: {
+        inputManifestHash: "",
+        changeMapHash: sha256(JSON.stringify(changeMap, null, 2)),
+      },
+      reviewedAreas: [],
+      findings: [],
+      uncoveredContext: [],
+      assumptions: [],
     };
     writeFileSync(join(stagesDir, "behavior-review.json"), JSON.stringify(behaviorReview, null, 2));
 
     const testReview = {
-      runId, stage: "test-review", createdAt: "2024-01-01T00:00:00.000Z",
-      sourceArtifacts: { inputManifestHash: "", changeMapHash: "", behaviorReviewHash: sha256(JSON.stringify(behaviorReview, null, 2)) },
-      reviewedBehaviors: [], findings: [],
+      runId,
+      stage: "test-review",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      sourceArtifacts: {
+        inputManifestHash: "",
+        changeMapHash: "",
+        behaviorReviewHash: sha256(JSON.stringify(behaviorReview, null, 2)),
+      },
+      reviewedBehaviors: [],
+      findings: [],
       verificationAssessment: { testCommandStatus: "unavailable", note: "" },
-      uncoveredContext: [], assumptions: [],
+      uncoveredContext: [],
+      assumptions: [],
     };
     writeFileSync(join(stagesDir, "test-review.json"), JSON.stringify(testReview, null, 2));
 
     const evidenceAudit = {
-      runId, stage: "evidence-audit", createdAt: "2024-01-01T00:00:00.000Z",
+      runId,
+      stage: "evidence-audit",
+      createdAt: "2024-01-01T00:00:00.000Z",
       sourceArtifacts: {
-        inputManifestHash: "", changeMapHash: "",
+        inputManifestHash: "",
+        changeMapHash: "",
         behaviorReviewHash: sha256(JSON.stringify(behaviorReview, null, 2)),
         testReviewHash: sha256(JSON.stringify(testReview, null, 2)),
       },
-      auditedFindings: [], summary: { accepted: 0, downgraded: 0, needsContext: 0, rejected: 0 }, assumptions: [],
+      auditedFindings: [],
+      summary: { accepted: 0, downgraded: 0, needsContext: 0, rejected: 0 },
+      assumptions: [],
     };
     writeFileSync(join(stagesDir, "evidence-audit.json"), JSON.stringify(evidenceAudit, null, 2));
 
@@ -132,7 +173,8 @@ describe("reviewStage - synthesis", () => {
       deduplicated: 0,
     };
     const issueLedger = {
-      runId, createdAt: "2024-01-01T00:00:00.000Z",
+      runId,
+      createdAt: "2024-01-01T00:00:00.000Z",
       sourceArtifacts: { evidenceAuditHash: "", behaviorReviewHash: "", testReviewHash: "" },
       issues,
       summary: issueSummary,
@@ -148,17 +190,24 @@ describe("reviewStage - synthesis", () => {
       needsContext: coverageItems.filter((i: any) => i.status === "needs_context").length,
     };
     const coverageLedger = {
-      runId, createdAt: "2024-01-01T00:00:00.000Z",
+      runId,
+      createdAt: "2024-01-01T00:00:00.000Z",
       sourceArtifacts: { changeMapHash: "", behaviorReviewHash: "", testReviewHash: "" },
       items: coverageItems,
       summary: coverageSummary,
     };
-    writeFileSync(join(ledgersDir, "coverage-ledger.json"), JSON.stringify(coverageLedger, null, 2));
+    writeFileSync(
+      join(ledgersDir, "coverage-ledger.json"),
+      JSON.stringify(coverageLedger, null, 2),
+    );
 
     // Create verification-ledger if provided
     if (opts?.verificationLedger) {
       mkdirSync(verificationDir, { recursive: true });
-      writeFileSync(join(verificationDir, "verification-ledger.json"), JSON.stringify(opts.verificationLedger, null, 2));
+      writeFileSync(
+        join(verificationDir, "verification-ledger.json"),
+        JSON.stringify(opts.verificationLedger, null, 2),
+      );
     }
 
     return { runId, issueLedger, coverageLedger };
@@ -166,19 +215,32 @@ describe("reviewStage - synthesis", () => {
 
   function createFakeAdapter(structuredOutput: unknown) {
     return {
-      detectCapabilities: vi.fn().mockReturnValue({ available: true, supportsJsonOutput: true, supportsJsonSchema: true }),
+      detectCapabilities: vi
+        .fn()
+        .mockReturnValue({ available: true, supportsJsonOutput: true, supportsJsonSchema: true }),
       runStage: vi.fn().mockResolvedValue({ rawOutput: {}, structuredOutput }),
     };
   }
 
   it("should only reference issueIds that exist in issue-ledger", async () => {
     const { runId } = createSynthesisFixture({
-      issues: [{
-        id: "issue-br-F001", sourceFindingRef: "F001", sourceStage: "behavior-review",
-        status: "accepted", evidenceClass: "observed", candidateImpact: "material",
-        title: "Test issue", summary: "test", impact: "test", recommendation: "test",
-        evidenceRefs: [], missingEvidence: [], missingContext: [],
-      }],
+      issues: [
+        {
+          id: "issue-br-F001",
+          sourceFindingRef: "F001",
+          sourceStage: "behavior-review",
+          status: "accepted",
+          evidenceClass: "observed",
+          candidateImpact: "material",
+          title: "Test issue",
+          summary: "test",
+          impact: "test",
+          recommendation: "test",
+          evidenceRefs: [],
+          missingEvidence: [],
+          missingContext: [],
+        },
+      ],
     });
 
     const adapter = createFakeAdapter({
@@ -190,47 +252,69 @@ describe("reviewStage - synthesis", () => {
       assumptions: [],
     });
 
-    await expect(reviewStage({ runId, stage: "synthesis", adapter }))
-      .rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "synthesis", adapter })).rejects.toThrow(StageError);
   });
 
   it("should fail when synthesis adds new evidenceRef not in issue-ledger", async () => {
     const { runId } = createSynthesisFixture({
-      issues: [{
-        id: "issue-br-F001", sourceFindingRef: "F001", sourceStage: "behavior-review",
-        status: "accepted", evidenceClass: "observed", candidateImpact: "material",
-        title: "Test issue", summary: "test", impact: "test", recommendation: "test",
-        evidenceRefs: ["git:abc123:src/index.ts#L1-L5"],
-        missingEvidence: [], missingContext: [],
-      }],
+      issues: [
+        {
+          id: "issue-br-F001",
+          sourceFindingRef: "F001",
+          sourceStage: "behavior-review",
+          status: "accepted",
+          evidenceClass: "observed",
+          candidateImpact: "material",
+          title: "Test issue",
+          summary: "test",
+          impact: "test",
+          recommendation: "test",
+          evidenceRefs: ["git:abc123:src/index.ts#L1-L5"],
+          missingEvidence: [],
+          missingContext: [],
+        },
+      ],
     });
 
     const adapter = createFakeAdapter({
       recommendation: "ready_to_merge",
       recommendationRationale: "All clear",
-      issueGroups: [{
-        title: "Group", issueIds: ["issue-br-F001"],
-        summary: "test",
-        // Synthesis tries to add its own evidence ref
-        evidenceRefs: ["git:abc123:src/other.ts#L1-L10"],
-      }],
+      issueGroups: [
+        {
+          title: "Group",
+          issueIds: ["issue-br-F001"],
+          summary: "test",
+          // Synthesis tries to add its own evidence ref
+          evidenceRefs: ["git:abc123:src/other.ts#L1-L10"],
+        },
+      ],
       verificationSummary: { passed: 0, failed: 0, skipped: 0, notRequired: 0, note: "" },
       uncoveredSummary: [],
       assumptions: [],
     });
 
-    await expect(reviewStage({ runId, stage: "synthesis", adapter }))
-      .rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "synthesis", adapter })).rejects.toThrow(StageError);
   });
 
   it("should fail when blocking candidate exists but recommendation is ready_to_merge", async () => {
     const { runId } = createSynthesisFixture({
-      issues: [{
-        id: "issue-br-F001", sourceFindingRef: "F001", sourceStage: "behavior-review",
-        status: "accepted", evidenceClass: "observed", candidateImpact: "merge_blocking",
-        title: "Blocking issue", summary: "test", impact: "test", recommendation: "test",
-        evidenceRefs: [], missingEvidence: [], missingContext: [],
-      }],
+      issues: [
+        {
+          id: "issue-br-F001",
+          sourceFindingRef: "F001",
+          sourceStage: "behavior-review",
+          status: "accepted",
+          evidenceClass: "observed",
+          candidateImpact: "merge_blocking",
+          title: "Blocking issue",
+          summary: "test",
+          impact: "test",
+          recommendation: "test",
+          evidenceRefs: [],
+          missingEvidence: [],
+          missingContext: [],
+        },
+      ],
     });
 
     const adapter = createFakeAdapter({
@@ -242,17 +326,26 @@ describe("reviewStage - synthesis", () => {
       assumptions: [],
     });
 
-    await expect(reviewStage({ runId, stage: "synthesis", adapter }))
-      .rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "synthesis", adapter })).rejects.toThrow(StageError);
   });
 
   it("should fail when verification failed but recommendation is ready_to_merge", async () => {
     const { runId } = createSynthesisFixture({
       verificationLedger: {
-        runId: "test-synthesis", createdAt: "2024-01-01T00:00:00.000Z",
-        runStatus: "completed", policySnapshotHash: "test",
+        runId: "test-synthesis",
+        createdAt: "2024-01-01T00:00:00.000Z",
+        runStatus: "completed",
+        policySnapshotHash: "test",
         preconditionErrors: [],
-        commands: [{ id: "test", argv: ["pnpm", "test"], required: true, status: "failed", selectionReason: "paths changed" }],
+        commands: [
+          {
+            id: "test",
+            argv: ["pnpm", "test"],
+            required: true,
+            status: "failed",
+            selectionReason: "paths changed",
+          },
+        ],
         summary: { passed: 0, failed: 1, skipped: 0, notRequired: 0 },
         workspaceChangedAfterVerify: false,
       },
@@ -262,13 +355,18 @@ describe("reviewStage - synthesis", () => {
       recommendation: "ready_to_merge",
       recommendationRationale: "Looks fine",
       issueGroups: [],
-      verificationSummary: { passed: 0, failed: 1, skipped: 0, notRequired: 0, note: "test failed" },
+      verificationSummary: {
+        passed: 0,
+        failed: 1,
+        skipped: 0,
+        notRequired: 0,
+        note: "test failed",
+      },
       uncoveredSummary: [],
       assumptions: [],
     });
 
-    await expect(reviewStage({ runId, stage: "synthesis", adapter }))
-      .rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "synthesis", adapter })).rejects.toThrow(StageError);
   });
 
   it("should fail when ledger hash mismatch and not call adapter", async () => {
@@ -287,8 +385,7 @@ describe("reviewStage - synthesis", () => {
       assumptions: [],
     });
 
-    await expect(reviewStage({ runId, stage: "synthesis", adapter }))
-      .rejects.toThrow(StageError);
+    await expect(reviewStage({ runId, stage: "synthesis", adapter })).rejects.toThrow(StageError);
 
     expect(adapter.runStage).not.toHaveBeenCalled();
   });
@@ -296,8 +393,24 @@ describe("reviewStage - synthesis", () => {
   it("should properly summarize uncovered and needs_context items", async () => {
     const { runId } = createSynthesisFixture({
       coverageItems: [
-        { id: "cov-1", area: "auth", paths: [], status: "uncovered", sources: ["change-map"], evidenceRefs: [], reason: "Not reviewed" },
-        { id: "cov-2", area: "db", paths: [], status: "needs_context", sources: ["change-map"], evidenceRefs: [], reason: "Need schema info" },
+        {
+          id: "cov-1",
+          area: "auth",
+          paths: [],
+          status: "uncovered",
+          sources: ["change-map"],
+          evidenceRefs: [],
+          reason: "Not reviewed",
+        },
+        {
+          id: "cov-2",
+          area: "db",
+          paths: [],
+          status: "needs_context",
+          sources: ["change-map"],
+          evidenceRefs: [],
+          reason: "Need schema info",
+        },
       ],
     });
 
@@ -342,11 +455,13 @@ describe("reviewStage - synthesis", () => {
     const { runId } = createSynthesisFixture({ issues });
 
     // Synthesis only references first 50 issues in groups
-    const issueGroups = [{
-      title: "All issues",
-      issueIds: issues.slice(0, 50).map((i) => i.id),
-      summary: "Grouped",
-    }];
+    const issueGroups = [
+      {
+        title: "All issues",
+        issueIds: issues.slice(0, 50).map((i) => i.id),
+        summary: "Grouped",
+      },
+    ];
 
     const adapter = createFakeAdapter({
       recommendation: "not_ready_to_merge",
@@ -361,28 +476,55 @@ describe("reviewStage - synthesis", () => {
     const artifact = JSON.parse(readFileSync(result.stageArtifactPath, "utf-8"));
 
     expect(artifact.assumptions).toEqual(
-      expect.arrayContaining([expect.stringContaining("Truncated")])
+      expect.arrayContaining([expect.stringContaining("Truncated")]),
     );
   });
 
   it("should write valid synthesis artifact on success", async () => {
     const { runId } = createSynthesisFixture({
-      issues: [{
-        id: "issue-br-F001", sourceFindingRef: "F001", sourceStage: "behavior-review",
-        status: "accepted", evidenceClass: "observed", candidateImpact: "material",
-        title: "Missing null check", summary: "Found missing null check",
-        impact: "NPE risk", recommendation: "Add null guard",
-        evidenceRefs: ["git:abc123:src/index.ts#L10-L15"],
-        missingEvidence: [], missingContext: [],
-      }],
+      issues: [
+        {
+          id: "issue-br-F001",
+          sourceFindingRef: "F001",
+          sourceStage: "behavior-review",
+          status: "accepted",
+          evidenceClass: "observed",
+          candidateImpact: "material",
+          title: "Missing null check",
+          summary: "Found missing null check",
+          impact: "NPE risk",
+          recommendation: "Add null guard",
+          evidenceRefs: ["git:abc123:src/index.ts#L10-L15"],
+          missingEvidence: [],
+          missingContext: [],
+        },
+      ],
       coverageItems: [
-        { id: "cov-1", area: "core logic", paths: ["src/index.ts"], status: "reviewed", sources: ["behavior-review"], evidenceRefs: [], reason: "Reviewed" },
+        {
+          id: "cov-1",
+          area: "core logic",
+          paths: ["src/index.ts"],
+          status: "reviewed",
+          sources: ["behavior-review"],
+          evidenceRefs: [],
+          reason: "Reviewed",
+        },
       ],
       verificationLedger: {
-        runId: "test-synthesis", createdAt: "2024-01-01T00:00:00.000Z",
-        runStatus: "completed", policySnapshotHash: "test",
+        runId: "test-synthesis",
+        createdAt: "2024-01-01T00:00:00.000Z",
+        runStatus: "completed",
+        policySnapshotHash: "test",
         preconditionErrors: [],
-        commands: [{ id: "build", argv: ["pnpm", "build"], required: true, status: "passed", selectionReason: "always" }],
+        commands: [
+          {
+            id: "build",
+            argv: ["pnpm", "build"],
+            required: true,
+            status: "passed",
+            selectionReason: "always",
+          },
+        ],
         summary: { passed: 1, failed: 0, skipped: 0, notRequired: 0 },
         workspaceChangedAfterVerify: false,
       },
@@ -391,12 +533,20 @@ describe("reviewStage - synthesis", () => {
     const adapter = createFakeAdapter({
       recommendation: "ready_to_merge",
       recommendationRationale: "Single material issue, all checks pass",
-      issueGroups: [{
-        title: "Null safety",
-        issueIds: ["issue-br-F001"],
-        summary: "One missing null check",
-      }],
-      verificationSummary: { passed: 1, failed: 0, skipped: 0, notRequired: 0, note: "build passed" },
+      issueGroups: [
+        {
+          title: "Null safety",
+          issueIds: ["issue-br-F001"],
+          summary: "One missing null check",
+        },
+      ],
+      verificationSummary: {
+        passed: 1,
+        failed: 0,
+        skipped: 0,
+        notRequired: 0,
+        note: "build passed",
+      },
       uncoveredSummary: [],
       assumptions: [],
     });

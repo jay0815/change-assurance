@@ -174,7 +174,9 @@ if (command === "review") {
           console.log(`\nWarning: Workspace changed after verify (invalidated)`);
         }
 
-        console.log(`\nLedger: .change-assurance/runs/${runId}/verification/verification-ledger.json`);
+        console.log(
+          `\nLedger: .change-assurance/runs/${runId}/verification/verification-ledger.json`,
+        );
       }
 
       // Exit with non-zero if blocked, invalidated, or has failures
@@ -221,8 +223,16 @@ if (command === "review") {
       process.exit(1);
     }
 
-    if (stage !== "change-map" && stage !== "behavior-review" && stage !== "test-review" && stage !== "evidence-audit" && stage !== "synthesis") {
-      console.error(`Error: Unsupported stage: ${stage}. Supported: change-map, behavior-review, test-review, evidence-audit, synthesis.`);
+    if (
+      stage !== "change-map" &&
+      stage !== "behavior-review" &&
+      stage !== "test-review" &&
+      stage !== "evidence-audit" &&
+      stage !== "synthesis"
+    ) {
+      console.error(
+        `Error: Unsupported stage: ${stage}. Supported: change-map, behavior-review, test-review, evidence-audit, synthesis.`,
+      );
       process.exit(1);
     }
 
@@ -282,7 +292,13 @@ if (command === "review") {
         const { readFileSync: readFile } = await import("node:fs");
         const issueLedger = JSON.parse(readFile(result.issueLedgerPath, "utf-8"));
         const coverageLedger = JSON.parse(readFile(result.coverageLedgerPath, "utf-8"));
-        console.log(JSON.stringify({ issueLedger: issueLedger.summary, coverageLedger: coverageLedger.summary }, null, 2));
+        console.log(
+          JSON.stringify(
+            { issueLedger: issueLedger.summary, coverageLedger: coverageLedger.summary },
+            null,
+            2,
+          ),
+        );
       } else {
         console.log(`Ledgers generated:`);
         console.log(`  Issue Ledger: ${result.issueLedgerPath}`);
@@ -519,11 +535,11 @@ if (command === "review") {
 
       // Print summary for repeat > 1
       if (repeat > 1) {
-        const caseIds = [...new Set(results.map(r => r.caseId))];
+        const caseIds = [...new Set(results.map((r) => r.caseId))];
         for (const cid of caseIds) {
-          const caseResults = results.filter(r => r.caseId === cid);
-          const passCount = caseResults.filter(r => r.passed).length;
-          const passRate = (passCount / caseResults.length * 100).toFixed(1);
+          const caseResults = results.filter((r) => r.caseId === cid);
+          const passCount = caseResults.filter((r) => r.passed).length;
+          const passRate = ((passCount / caseResults.length) * 100).toFixed(1);
           console.log(`\n${cid}: ${passCount}/${caseResults.length} passed (${passRate}%)`);
         }
       }
