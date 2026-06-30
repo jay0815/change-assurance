@@ -400,11 +400,27 @@ export function reviewValidate(input: ValidateInput): ValidationResult {
     status = "valid";
   }
 
-  // Determine finalDecision
+  // Determine finalDecision from audited facts. Synthesis can summarize rationale, but
+  // merge readiness is a harness decision derived from ledgers and verification.
   let finalDecision: ValidationResult["finalDecision"] = null;
   if (status === "valid" && existsSync(synthesisPath)) {
     const synthesis = readJsonSafe(synthesisPath) as any;
-    finalDecision = synthesis?.recommendation ?? null;
+    const issueLedger = existsSync(issueLedgerPath) ? readJsonSafe(issueLedgerPath) as any : null;
+    const verificationLedger = existsSync(verificationLedgerPath) ? readJsonSafe(verificationLedgerPath) as any : null;
+    const hasBlockingIssue = issueLedger?.issues?.some((issue: any) =>
+      issue.candidateImpact === "merge_blocking"
+    ) ?? false;
+    const hasFailedVerification = verificationLedger?.commands?.some((command: any) =>
+      command.status === "failed"
+    ) ?? false;
+
+    if (hasBlockingIssue || hasFailedVerification) {
+      finalDecision = "not_ready_to_merge";
+    } else if (synthesis?.recommendation === "not_ready_to_merge") {
+      finalDecision = "insufficient_evidence";
+    } else {
+      finalDecision = synthesis?.recommendation ?? null;
+    }
   }
 
   const result: ValidationResult = {

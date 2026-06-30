@@ -175,26 +175,48 @@ ca review report
 
 ### M5：评测与回归
 
-目标：验证系统不是“看起来会审”，而是真的稳定。
+目标：验证系统不是”看起来会审”，而是真的稳定。
 
 产物：
 
 ```text
 evals/
-├─ fixtures/
-├─ golden-cases/
-└─ scoring/
+├─ cases/
+│  ├─ case-001-error-state-not-restored/
+│  ├─ case-002-weak-test/
+│  ├─ case-003-verification-failure/
+│  ├─ case-004-safe-change/
+│  ├─ case-005-insufficient-context/
+│  └─ case-006-no-false-blocker/
+└─ results/
 ```
 
-首批案例建议覆盖：
+CLI 命令：
+
+```bash
+ca eval run --case <case-id> --engine claude --repeat <n>
+ca eval run --all --engine claude --repeat <n>
+```
+
+首批案例覆盖：
 
 ```text
-- 明确回归 bug
-- 测试存在但无效
-- 无证据猜测
-- 正常可合并变更
-- PR 描述与 diff 不一致
-- 高风险变更缺少验证
+- case-001: 失败路径状态未恢复（确认的行为缺陷）
+- case-002: 弱测试（测试存在但无断言）
+- case-003: 验证命令失败
+- case-004: 安全变更（不应有 blocker）
+- case-005: 缺少业务上下文
+- case-006: 机械重构（不应有 false blocker）
+```
+
+评分维度：
+
+```text
+- decision: 最终决策是否在 allowedFinalDecisions 内
+- mustFind: 必须发现的 issue 是否被找到
+- mustNotFind: 不应出现的 issue 是否被误报
+- coverage: 必须覆盖的区域是否被覆盖
+- verification: 验证结果是否一致
 ```
 
 完成标准：

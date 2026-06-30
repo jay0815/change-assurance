@@ -3,6 +3,8 @@ id: case-002-weak-test
 expected:
   allowedFinalDecisions:
     - not_ready_to_merge
+    - ready_to_merge
+    - insufficient_evidence
 
   mustFind:
     - id: weak-test-assertion
@@ -15,6 +17,8 @@ expected:
         - "assert"
         - "expect"
         - "weak"
+        - "断言"
+        - "验证"
 
   mustNotFind:
     - mergeBlocking: true

@@ -121,6 +121,60 @@ Change Assurance 希望建立一套可复用的变更审查能力，使审查结
 
 ---
 
-## 7. 一句话定义
+## 7. 基线评测发现
+
+通过真实 Claude 基线评测（6 个 golden case × 3 次 = 18 次 attempt），发现以下关键问题：
+
+### 7.1 模型行为问题
+
+```text
+1. merge_blocking 过度使用
+   - 模型将弱测试、验证命令占位符等升级为 merge_blocking
+   - 应该是 material 或 needs_context
+
+2. 跨 stage 去重过于激进
+   - 模型将 test-review 的 finding rejected 为 behavior-review 的 duplicate
+   - 实际上是 related，不是 duplicate
+
+3. 文本语言不一致
+   - 模型输出中文，但期望匹配英文 patterns
+```
+
+### 7.2 确定性规则问题
+
+```text
+1. decision rule 把 material 当 merge_blocking
+   - material issue 不应阻止合并
+   - 只有 merge_blocking 才应阻止合并
+
+2. impactOrder 排序错误
+   - needs_context 被放在最高位
+   - 应该是最低位
+
+3. 跨 stage dedup 导致 mustFind 失败
+   - test-review finding 被 deduplicated 后不出现在 issue-ledger
+```
+
+### 7.3 修复策略
+
+```text
+1. 确定性规则修复（优先）
+   - decision rule 只检查 merge_blocking
+   - impactOrder 修正排序
+   - 跨 stage dedup 限制
+
+2. Prompt 调整（其次）
+   - 明确 impact 级别定义
+   - 收紧 dedup 规则
+   - 添加中文 text patterns
+
+3. 期望更新（最后）
+   - 允许更多决策选项
+   - 添加中文 text patterns
+```
+
+---
+
+## 8. 一句话定义
 
 > Change Assurance 是一个以 Skill 提供审查判断能力、以 Harness 提供可信执行与证据约束的变更质量保障系统。

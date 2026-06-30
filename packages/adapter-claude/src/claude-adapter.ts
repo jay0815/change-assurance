@@ -58,7 +58,7 @@ export class ClaudeAdapter {
 
     const result = spawnSync(
       "claude",
-      ["-p", "--output-format", "stream-json", "--json-schema", JSON.stringify(input.schema)],
+      buildClaudeArgs(input.schema),
       {
         cwd: input.runDirectory,
         encoding: "utf-8",
@@ -68,7 +68,7 @@ export class ClaudeAdapter {
     );
 
     if (result.status !== 0) {
-      throw new AdapterError(`Claude CLI failed: ${result.stderr}`);
+      throw new AdapterError(`Claude CLI failed: ${extractFailureMessage(result.stdout, result.stderr)}`);
     }
 
     try {
@@ -93,7 +93,17 @@ export class ClaudeAdapter {
   }
 
   private extractStructuredOutput(messages: unknown[]): unknown {
-    // Find the assistant message with StructuredOutput tool use
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (typeof msg !== "object" || msg === null) continue;
+      if ("structured_output" in msg) {
+        return (msg as any).structured_output;
+      }
+    }
+
+    let structuredOutput: unknown;
+
+    // Claude may emit an invalid StructuredOutput and then repair it in a later turn.
     for (const msg of messages) {
       if (typeof msg !== "object" || msg === null) continue;
 
@@ -116,11 +126,48 @@ export class ClaudeAdapter {
             (block as any).name === "StructuredOutput" &&
             "input" in block
           ) {
-            return (block as any).input;
+            structuredOutput = (block as any).input;
           }
         }
       }
     }
+
+    if (structuredOutput !== undefined) {
+      return structuredOutput;
+    }
+
     throw new AdapterError("No StructuredOutput found in Claude CLI output");
   }
+}
+
+function buildClaudeArgs(schema: object): string[] {
+  const args = ["--bare", "--tools", "", "-p", "--output-format", "stream-json", "--json-schema", JSON.stringify(schema)];
+  const settingsPath = process.env.CHANGE_ASSURANCE_CLAUDE_SETTINGS?.trim();
+  if (!settingsPath) return args;
+  return ["--settings", settingsPath, ...args];
+}
+
+function extractFailureMessage(stdout: string | Buffer | null | undefined, stderr: string | Buffer | null | undefined): string {
+  const stderrText = String(stderr ?? "").trim();
+  if (stderrText) return stderrText;
+
+  const stdoutText = String(stdout ?? "").trim();
+  if (!stdoutText) return "";
+
+  try {
+    const lines = stdoutText.split("\n").filter((line) => line.trim() !== "");
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const parsed = JSON.parse(lines[i]);
+      if (typeof parsed?.result === "string" && parsed.result.trim() !== "") {
+        return parsed.result.trim();
+      }
+      if (typeof parsed?.error === "string" && parsed.error.trim() !== "") {
+        return parsed.error.trim();
+      }
+    }
+  } catch {
+    return stdoutText;
+  }
+
+  return stdoutText;
 }

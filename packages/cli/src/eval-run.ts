@@ -11,6 +11,7 @@ import { resolve, join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { parse } from "yaml";
 import { reviewRun } from "./review-run.js";
+import { ClaudeAdapter } from "@change-assurance/adapter-claude";
 import type { ReviewRunResult } from "./review-run.js";
 import type { VerificationLedger } from "@change-assurance/core";
 
@@ -127,8 +128,8 @@ function getWorkspaceDir(caseId: string, attempt: number): string {
   return resolve(process.cwd(), EVALS_DIR, WORKSPACES_DIR, `${caseId}-${attempt}`);
 }
 
-function getResultsDir(caseId: string, attempt: number): string {
-  return resolve(process.cwd(), EVALS_DIR, RESULTS_DIR, caseId, `attempt-${attempt}`);
+function getResultsDir(rootDir: string, caseId: string, attempt: number): string {
+  return resolve(rootDir, EVALS_DIR, RESULTS_DIR, caseId, `attempt-${attempt}`);
 }
 
 function loadExpectations(caseId: string): EvalExpectations {
@@ -171,9 +172,6 @@ function createWorkspace(caseId: string, attempt: number): string {
   // Copy repo to workspace
   cpSync(repoDir, workspaceDir, { recursive: true });
 
-  // Create .gitignore to exclude change-assurance artifacts
-  writeFileSync(join(workspaceDir, ".gitignore"), ".change-assurance/\n");
-
   // Initialize git repo
   execFileSync("git", ["init"], { cwd: workspaceDir, stdio: "ignore" });
   execFileSync("git", ["config", "user.email", "eval@test.com"], {
@@ -181,13 +179,13 @@ function createWorkspace(caseId: string, attempt: number): string {
     stdio: "ignore",
   });
   execFileSync("git", ["config", "user.name", "Eval Test"], { cwd: workspaceDir, stdio: "ignore" });
-  execFileSync("git", ["add", "-A"], { cwd: workspaceDir, stdio: "ignore" });
-  execFileSync("git", ["commit", "-m", "initial"], { cwd: workspaceDir, stdio: "ignore" });
+  writeFileSync(join(workspaceDir, ".git", "info", "exclude"), ".change-assurance/\n", { flag: "a" });
 
-  // Create a second commit so HEAD~1 exists
-  writeFileSync(join(workspaceDir, ".gitkeep"), "");
-  execFileSync("git", ["add", ".gitkeep"], { cwd: workspaceDir, stdio: "ignore" });
-  execFileSync("git", ["commit", "-m", "add .gitkeep"], { cwd: workspaceDir, stdio: "ignore" });
+  // Create a stable empty base commit, then commit the case snapshot as HEAD.
+  execFileSync("git", ["commit", "--allow-empty", "-m", "base"], { cwd: workspaceDir, stdio: "ignore" });
+
+  execFileSync("git", ["add", "-A"], { cwd: workspaceDir, stdio: "ignore" });
+  execFileSync("git", ["commit", "-m", "case head"], { cwd: workspaceDir, stdio: "ignore" });
 
   return workspaceDir;
 }
@@ -204,10 +202,42 @@ function scoreResult(
     coverage: { missingAreas: [] },
     verification: { mismatches: [] },
   };
-  const issueLedgerPath = join(runDir, "ledgers", "issue-ledger.json");
-  const issueLedger = existsSync(issueLedgerPath)
-    ? JSON.parse(readFileSync(issueLedgerPath, "utf-8"))
-    : undefined;
+
+  let issueLedger: any | undefined;
+  if (runResult.status === "completed" && runResult.runId) {
+    const issueLedgerPath = join(runDir, "ledgers", "issue-ledger.json");
+    if (existsSync(issueLedgerPath)) {
+      issueLedger = JSON.parse(readFileSync(issueLedgerPath, "utf-8"));
+    }
+  }
+
+  const issueMatchesExpectation = (issue: any, expected: EvalExpectations["expected"]["mustFind"][number]): boolean => {
+    // Check sourceStage
+    if (issue.sourceStage !== expected.sourceStage) return false;
+
+    // Check minImpact
+    const impactOrder = ["needs_context", "advisory", "material", "merge_blocking"];
+    const issueImpactIdx = impactOrder.indexOf(issue.candidateImpact);
+    const minImpactIdx = impactOrder.indexOf(expected.minImpact);
+    if (issueImpactIdx < minImpactIdx) return false;
+
+    // Check evidencePaths
+    const hasEvidence = expected.evidencePaths.some((path) =>
+      issue.evidenceRefs?.some((ref: string) => ref.includes(path))
+    );
+    if (!hasEvidence) return false;
+
+    // Check anyTextPatterns
+    const text = [issue.title, issue.summary, issue.trigger, issue.impact]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    return expected.anyTextPatterns.some((pattern) =>
+      text.includes(pattern.toLowerCase())
+    );
+  };
+
+  const expectedMergeBlockingIssueIds = new Set<string>();
 
   // Score decision
   scores.decision = expectations.expected.allowedFinalDecisions.includes(
@@ -218,35 +248,17 @@ function scoreResult(
   if (runResult.status === "completed" && runResult.runId) {
     if (issueLedger) {
       for (const expected of expectations.expected.mustFind) {
-        const found = issueLedger.issues.some((issue: any) => {
-          // Check sourceStage
-          if (issue.sourceStage !== expected.sourceStage) return false;
+        const matchedIssues = issueLedger.issues.filter((issue: any) => issueMatchesExpectation(issue, expected));
 
-          // Check minImpact
-          const impactOrder = ["advisory", "material", "merge_blocking", "needs_context"];
-          const issueImpactIdx = impactOrder.indexOf(issue.candidateImpact);
-          const minImpactIdx = impactOrder.indexOf(expected.minImpact);
-          if (issueImpactIdx < minImpactIdx) return false;
-
-          // Check evidencePaths
-          const hasEvidence = expected.evidencePaths.some((path) =>
-            issue.evidenceRefs?.some((ref: string) => ref.includes(path)),
-          );
-          if (!hasEvidence) return false;
-
-          // Check anyTextPatterns
-          const text = [issue.title, issue.summary, issue.trigger, issue.impact]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase();
-          const hasPattern = expected.anyTextPatterns.some((pattern) =>
-            text.includes(pattern.toLowerCase()),
-          );
-          return hasPattern;
-        });
-
-        if (found) {
+        if (matchedIssues.length > 0) {
           scores.mustFind.matched.push(expected.id);
+          if (expected.minImpact === "merge_blocking") {
+            for (const matchedIssue of matchedIssues) {
+              if (matchedIssue.candidateImpact === "merge_blocking") {
+                expectedMergeBlockingIssueIds.add(matchedIssue.id);
+              }
+            }
+          }
         } else {
           scores.mustFind.missing.push(expected.id);
         }
@@ -257,10 +269,10 @@ function scoreResult(
   // Score mustNotFind
   for (const rule of expectations.expected.mustNotFind) {
     if (rule.mergeBlocking) {
-      const hasMergeBlockingIssue =
-        issueLedger?.issues?.some((issue: any) => issue.candidateImpact === "merge_blocking") ??
-        false;
-      if (hasMergeBlockingIssue) {
+      const unsupportedMergeBlockingIssues = issueLedger?.issues?.filter((issue: any) =>
+        issue.candidateImpact === "merge_blocking" && !expectedMergeBlockingIssueIds.has(issue.id)
+      ) ?? [];
+      if (unsupportedMergeBlockingIssues.length > 0) {
         scores.mustNotFind.violations.push(rule.reason ?? "Unexpected blocker");
       }
     }
@@ -386,7 +398,7 @@ export async function evalRun(options: EvalRunOptions): Promise<EvalResult[]> {
     const expectations = loadExpectations(cid);
 
     for (let attempt = 1; attempt <= repeat; attempt++) {
-      const result = await runSingleAttempt(cid, attempt, expectations);
+      const result = await runSingleAttempt(cid, attempt, expectations, engine);
       results.push(result);
     }
   }
@@ -398,71 +410,36 @@ async function runSingleAttempt(
   caseId: string,
   attempt: number,
   expectations: EvalExpectations,
+  engine: "claude",
 ): Promise<EvalResult> {
+  const originalCwd = process.cwd();
   const workspaceDir = createWorkspace(caseId, attempt);
+  const resultsDir = getResultsDir(originalCwd, caseId, attempt);
 
   // Change to workspace directory
-  const originalCwd = process.cwd();
   process.chdir(workspaceDir);
 
   try {
+    // Create adapter based on engine
+    let adapter: any;
+    if (engine === "claude") {
+      adapter = new ClaudeAdapter();
+    } else {
+      throw new EvalError(`Unsupported engine: ${engine}`);
+    }
+
+    console.log(`[${caseId}] Starting review run (attempt ${attempt})...`);
+
     // Run review pipeline
     const runResult = await reviewRun({
       base: "HEAD~1",
       head: "HEAD",
-      engine: "claude",
+      engine,
       dryRun: true,
-      adapter: {
-        detectCapabilities: () => ({ available: true }),
-        runStage: async (input: any) => {
-          // Return minimal valid output for each stage
-          const structuredOutput: any = {};
-          const verificationLedger = loadCurrentVerificationLedger(input.runDirectory);
-          const verificationSummary = getVerificationSummary(verificationLedger);
-
-          if (input.stage === "change-map") {
-            structuredOutput.changedModules = [
-              { path: ".gitkeep", role: "file", changeSummary: "minor change" },
-            ];
-            structuredOutput.behaviorChanges = [];
-            structuredOutput.riskAreas = [];
-            structuredOutput.reviewPriorities = [];
-            structuredOutput.uncoveredContext = [];
-            structuredOutput.assumptions = ["Minor file change, no significant behavior impact"];
-          } else if (input.stage === "behavior-review") {
-            structuredOutput.reviewedAreas = [
-              { area: "general", paths: [".gitkeep"], focus: "file change", evidenceRefs: [] },
-            ];
-            structuredOutput.findings = [];
-            structuredOutput.uncoveredContext = [];
-            structuredOutput.assumptions = [];
-          } else if (input.stage === "test-review") {
-            structuredOutput.reviewedBehaviors = [];
-            structuredOutput.findings = [];
-            structuredOutput.verificationAssessment = {
-              testCommandStatus: getTestCommandStatus(verificationSummary),
-              note: "Derived from eval verification ledger",
-            };
-            structuredOutput.uncoveredContext = [];
-            structuredOutput.assumptions = [];
-          } else if (input.stage === "evidence-audit") {
-            structuredOutput.auditedFindings = [];
-            structuredOutput.summary = { accepted: 0, downgraded: 0, needsContext: 0, rejected: 0 };
-          } else if (input.stage === "synthesis") {
-            structuredOutput.issueGroups = [];
-            structuredOutput.recommendation =
-              verificationSummary.failed > 0 ? "not_ready_to_merge" : "insufficient_evidence";
-            structuredOutput.recommendationRationale =
-              verificationSummary.failed > 0 ? "Verification failed" : "No issues found";
-            structuredOutput.verificationSummary = verificationSummary;
-            structuredOutput.uncoveredSummary = [];
-            structuredOutput.assumptions = [];
-          }
-
-          return { rawOutput: { messages: [] }, structuredOutput };
-        },
-      },
+      adapter,
     });
+
+    console.log(`[${caseId}] Review run completed: ${runResult.status}`);
 
     // Score the result
     const runDir = resolve(workspaceDir, ".change-assurance", "runs", runResult.runId);
@@ -487,7 +464,6 @@ async function runSingleAttempt(
     }
 
     // Save result
-    const resultsDir = getResultsDir(caseId, attempt);
     mkdirSync(resultsDir, { recursive: true });
 
     const evalResult: EvalResult = {

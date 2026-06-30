@@ -60,6 +60,7 @@ describe("reviewValidate", () => {
     skipSynthesis?: boolean;
     skipLedgers?: boolean;
     blockingIssue?: boolean;
+    materialIssue?: boolean;
     failedVerification?: boolean;
     dirtyWorkspace?: boolean;
     headChanged?: boolean;
@@ -212,25 +213,13 @@ describe("reviewValidate", () => {
 
     if (!opts?.skipLedgers) {
       // Issue ledger
-      const issues = opts?.blockingIssue
-        ? [
-            {
-              id: "issue-br-F001",
-              sourceFindingRef: "F001",
-              sourceStage: "behavior-review",
-              status: "accepted",
-              evidenceClass: "observed",
-              candidateImpact: "merge_blocking",
-              title: "Blocking issue",
-              summary: "test",
-              impact: "test",
-              recommendation: "test",
-              evidenceRefs: [],
-              missingEvidence: [],
-              missingContext: [],
-            },
-          ]
-        : [];
+      const hasIssue = opts?.blockingIssue || opts?.materialIssue;
+      const issues = hasIssue ? [{
+        id: "issue-br-F001", sourceFindingRef: "F001", sourceStage: "behavior-review",
+        status: "accepted", evidenceClass: "observed", candidateImpact: opts?.blockingIssue ? "merge_blocking" : "material",
+        title: opts?.blockingIssue ? "Blocking issue" : "Material issue", summary: "test", impact: "test", recommendation: "test",
+        evidenceRefs: [], missingEvidence: [], missingContext: [],
+      }] : [];
       const issueLedger = {
         runId,
         createdAt: "2024-01-01T00:00:00.000Z",
@@ -421,6 +410,28 @@ describe("reviewValidate", () => {
 
     expect(result.status).toBe("invalidated");
     expect(result.errors.some((e) => e.code === "DECISION_CONFLICT")).toBe(true);
+  });
+
+  it("should use synthesis recommendation when only material issues exist (not blocking)", () => {
+    const { runId } = createFullChainFixture({
+      materialIssue: true,
+      synthesisRecommendation: "escalate",
+    });
+    const result = reviewValidate({ runId });
+
+    expect(result.status).toBe("valid");
+    expect(result.finalDecision).toBe("escalate");
+  });
+
+  it("should not allow not_ready_to_merge without merge_blocking issue or failed verification", () => {
+    const { runId } = createFullChainFixture({
+      materialIssue: true,
+      synthesisRecommendation: "not_ready_to_merge",
+    });
+    const result = reviewValidate({ runId });
+
+    expect(result.status).toBe("valid");
+    expect(result.finalDecision).toBe("insufficient_evidence");
   });
 
   it("should return invalidated when verification failed but synthesis says ready_to_merge", () => {

@@ -48,11 +48,27 @@ export function isWorkingTreeDirty(): boolean {
 }
 
 export function getDiff(base: string, head: string): string {
-  return git(["diff", `${base}...${head}`]);
+  // Check if base exists
+  try {
+    git(["rev-parse", base]);
+    return git(["diff", `${base}...${head}`]);
+  } catch {
+    // Base doesn't exist (e.g., HEAD~1 on initial commit), show all changes from empty tree
+    return git(["diff", "4b825dc642cb6eb9a060e54bf899d15363d4aa98", head]);
+  }
 }
 
 export function getChangedFiles(base: string, head: string): ChangedFile[] {
-  const raw = git(["diff", "--numstat", `${base}...${head}`]);
+  // Check if base exists
+  let raw: string;
+  try {
+    git(["rev-parse", base]);
+    raw = git(["diff", "--numstat", `${base}...${head}`]);
+  } catch {
+    // Base doesn't exist, show all changes from empty tree
+    raw = git(["diff", "--numstat", "4b825dc642cb6eb9a060e54bf899d15363d4aa98", head]);
+  }
+
   if (!raw) return [];
 
   return raw.split("\n").map((line) => {

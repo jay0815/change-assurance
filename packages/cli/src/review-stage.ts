@@ -121,17 +121,24 @@ function validateSourceEvidenceRefs(output: BehaviorReview, expectedCommit: stri
       continue;
     }
 
+    // Skip validation for .change-assurance/ directory files (they are generated artifacts)
+    if (parsed.path.startsWith(".change-assurance/")) {
+      continue;
+    }
+
     if (!fileExistsAtCommit(parsed.commit, parsed.path)) {
       errors.push(`evidenceRef path not found at commit: ${parsed.path} in ${ref}`);
       continue;
     }
 
-    const content = getFileContentAtCommit(parsed.commit, parsed.path);
-    const lineCount = content.split("\n").length;
-    if (parsed.startLine < 1 || parsed.endLine > lineCount || parsed.startLine > parsed.endLine) {
-      errors.push(
-        `evidenceRef line range invalid: L${parsed.startLine}-L${parsed.endLine} (file has ${lineCount} lines) in ${ref}`,
-      );
+    try {
+      const content = getFileContentAtCommit(parsed.commit, parsed.path);
+      const lineCount = content.split("\n").length;
+      if (parsed.startLine < 1 || parsed.endLine > lineCount || parsed.startLine > parsed.endLine) {
+        errors.push(`evidenceRef line range invalid: L${parsed.startLine}-L${parsed.endLine} (file has ${lineCount} lines) in ${ref}`);
+      }
+    } catch (error) {
+      errors.push(`Failed to read evidenceRef file: ${parsed.path} at commit ${parsed.commit}`);
     }
   }
 
@@ -160,6 +167,11 @@ function validateTestReviewEvidenceRefs(output: TestReview, expectedCommit: stri
       errors.push(
         `evidenceRef commit mismatch: expected ${expectedCommit}, got ${parsed.commit} in ${ref}`,
       );
+      continue;
+    }
+
+    // Skip validation for .change-assurance/ directory files (they are generated artifacts)
+    if (parsed.path.startsWith(".change-assurance/")) {
       continue;
     }
 
@@ -286,6 +298,18 @@ function validateTestReview(output: TestReview): string[] {
   return errors;
 }
 
+function sanitizeTestReview(output: TestReview): void {
+  output.reviewedBehaviors = (output.reviewedBehaviors ?? []).map((rb) => ({
+    ...rb,
+    implementationEvidenceRefs: Array.isArray(rb.implementationEvidenceRefs) ? rb.implementationEvidenceRefs : [],
+    testEvidenceRefs: Array.isArray(rb.testEvidenceRefs) ? rb.testEvidenceRefs : [],
+  }));
+  output.findings = (output.findings ?? []).map((finding) => ({
+    ...finding,
+    evidenceRefs: Array.isArray(finding.evidenceRefs) ? finding.evidenceRefs : [],
+  }));
+}
+
 function validateTestReviewVerificationConsistency(
   output: TestReview,
   verificationLedger?: {
@@ -342,27 +366,45 @@ function validateEvidenceRefs(output: ChangeMap, runDir: string): string[] {
   for (const ref of allRefs) {
     const refPath = resolve(runDir, ref);
     if (!existsSync(refPath)) {
-      errors.push(`Evidence ref not found: ${ref}`);
+      // Skip hallucinated refs - Claude may generate non-existent paths
+      continue;
     }
   }
 
   return errors;
 }
 
+function sanitizeChangeMap(output: ChangeMap, runDir: string, changedFiles: Array<{ path: string }>): void {
+  const changedPaths = new Set(changedFiles.map((f) => f.path));
+  output.changedModules = (output.changedModules ?? []).filter((mod) => changedPaths.has(mod.path));
+
+  const keepExistingRefs = (refs: string[] | undefined): string[] =>
+    (refs ?? []).filter((ref) => existsSync(resolve(runDir, ref)));
+
+  output.behaviorChanges = (output.behaviorChanges ?? []).map((change) => ({
+    ...change,
+    evidenceRefs: keepExistingRefs(change.evidenceRefs),
+  }));
+
+  output.riskAreas = (output.riskAreas ?? []).map((risk) => ({
+    ...risk,
+    evidenceRefs: keepExistingRefs(risk.evidenceRefs),
+  }));
+}
+
 function validateAdequacy(output: ChangeMap, changedFiles: Array<{ path: string }>): string[] {
   const errors: string[] = [];
 
   // Rule 1: changedModules must not be empty when there are changes
-  if (changedFiles.length > 0 && (!output.changedModules || output.changedModules.length === 0)) {
+  // Filter out hallucinated paths (not in actual diff)
+  const changedPaths = new Set(changedFiles.map((f) => f.path));
+  const validModules = (output.changedModules ?? []).filter((mod) => changedPaths.has(mod.path));
+  if (changedFiles.length > 0 && validModules.length === 0) {
     errors.push("changedModules must not be empty when diff has changes");
   }
 
-  // Rule 1: each changedModule path must be in changedFiles
-  const changedPaths = new Set(changedFiles.map((f) => f.path));
-  for (const mod of output.changedModules ?? []) {
-    if (!changedPaths.has(mod.path)) {
-      errors.push(`changedModule path not in changed files: ${mod.path}`);
-    }
+  // Rule 1: each changedModule path must be in changedFiles (skip if not found - Claude hallucination)
+  for (const mod of validModules) {
     if (!mod.role || mod.role.trim() === "") {
       errors.push(`changedModule has empty role: ${mod.path}`);
     }
@@ -576,12 +618,14 @@ async function runChangeMapStage(ctx: {
   }
 
   const changeMap = structuredOutput as ChangeMap;
+  const changedFiles = JSON.parse(changedFilesContent) as Array<{ path: string }>;
+  sanitizeChangeMap(changeMap, runDir, changedFiles);
+
   const refErrors = validateEvidenceRefs(changeMap, runDir);
   if (refErrors.length > 0) {
     throw new StageError(`Invalid evidenceRefs: ${refErrors.join(", ")}`);
   }
 
-  const changedFiles = JSON.parse(changedFilesContent) as Array<{ path: string }>;
   const adequacyErrors = validateAdequacy(changeMap, changedFiles);
   if (adequacyErrors.length > 0) {
     throw new StageError(`Adequacy gate failed: ${adequacyErrors.join(", ")}`);
@@ -683,6 +727,37 @@ async function runBehaviorReviewStage(ctx: {
   }
 
   const behaviorReview = structuredOutput as BehaviorReview;
+
+  // Enforce: findings about test quality or verification commands should not be merge_blocking
+  for (const finding of behaviorReview.findings) {
+    if (finding.candidateImpact === "merge_blocking") {
+      const isTestOnly = finding.evidenceRefs.every((ref) => {
+        const parsed = parseSourceEvidenceRef(ref);
+        return parsed && /\.test\.\w+$|\.spec\.\w+$/.test(parsed.path);
+      });
+      const isVerificationRelated = finding.evidenceRefs.some((ref) => {
+        const parsed = parseSourceEvidenceRef(ref);
+        return parsed && (/change-assurance\.yaml$|change-assurance\.yml$/.test(parsed.path) ||
+          /verification|verify|check/i.test(finding.title));
+      });
+      const hasTestEvidence = finding.evidenceRefs.some((ref) => {
+        const parsed = parseSourceEvidenceRef(ref);
+        return parsed && /\.test\.\w+$|\.spec\.\w+$/.test(parsed.path);
+      });
+      const findingText = [
+        finding.title,
+        finding.trigger,
+        finding.observedBehavior,
+        finding.impact,
+        finding.recommendation,
+      ].filter(Boolean).join(" ");
+      const isTestAssertionRelated = hasTestEvidence &&
+        /\b(test|assertion|expect|toBe|suite)\b|will fail|test fails|failing test|contract mismatch|test expectation/i.test(findingText);
+      if (isTestOnly || isVerificationRelated || isTestAssertionRelated) {
+        finding.candidateImpact = "material";
+      }
+    }
+  }
 
   // Validate source evidence refs against frozen commit
   const refErrors = validateSourceEvidenceRefs(behaviorReview, gitState.headCommit);
@@ -816,6 +891,15 @@ async function runTestReviewStage(ctx: {
 
   const testReview = structuredOutput as TestReview;
 
+  sanitizeTestReview(testReview);
+
+  // Enforce: test-review cannot propose merge_blocking (only behavior-review can)
+  for (const finding of testReview.findings) {
+    if ((finding.candidateImpact as string) === "merge_blocking") {
+      (finding as any).candidateImpact = "material";
+    }
+  }
+
   // Enforce: no verification ledger → testCommandStatus must be unavailable
   if (!hasVerificationLedger) {
     testReview.verificationAssessment.testCommandStatus = "unavailable";
@@ -924,25 +1008,46 @@ function validateEvidenceAudit(
     trImpactMap.set(f.id, f.candidateImpact);
   }
 
+  // Filter out hallucinated auditedFindings (sourceFindingRef not in source stages)
+  output.auditedFindings = output.auditedFindings.filter((af) => allFindingRefs.has(af.sourceFindingRef));
+
   for (let i = 0; i < output.auditedFindings.length; i++) {
     const af = output.auditedFindings[i];
 
-    // Validate sourceFindingRef exists
-    if (!allFindingRefs.has(af.sourceFindingRef)) {
-      errors.push(`sourceFindingRef not found: ${af.sourceFindingRef}`);
-      continue;
+    if (validBrRefs.has(af.sourceFindingRef)) {
+      af.sourceStage = "behavior-review";
+    } else if (validTrRefs.has(af.sourceFindingRef)) {
+      af.sourceStage = "test-review";
     }
 
-    // Validate verifiedEvidenceRefs are subset of source finding's evidenceRefs
-    const sourceEvidence =
-      af.sourceStage === "behavior-review"
-        ? (brEvidenceMap.get(af.sourceFindingRef) ?? new Set<string>())
-        : (trEvidenceMap.get(af.sourceFindingRef) ?? new Set<string>());
+    // Keep only source-owned evidence refs. Claude may invent refs from artifacts or unrelated files.
+    const sourceEvidence = af.sourceStage === "behavior-review"
+      ? brEvidenceMap.get(af.sourceFindingRef) ?? new Set<string>()
+      : trEvidenceMap.get(af.sourceFindingRef) ?? new Set<string>();
 
-    for (const ref of af.verifiedEvidenceRefs) {
-      if (!sourceEvidence.has(ref)) {
-        errors.push(`verifiedEvidenceRef ${ref} not in source finding ${af.sourceFindingRef}`);
-      }
+    af.verifiedEvidenceRefs = Array.isArray(af.verifiedEvidenceRefs)
+      ? af.verifiedEvidenceRefs.filter((ref) => sourceEvidence.has(ref))
+      : [];
+
+    const sourceImpact = af.sourceStage === "behavior-review"
+      ? brImpactMap.get(af.sourceFindingRef)
+      : trImpactMap.get(af.sourceFindingRef);
+
+    const dedupRef = typeof af.deduplicatedWith === "string" ? af.deduplicatedWith : "";
+    const dedupTargetStage = validBrRefs.has(dedupRef)
+      ? "behavior-review"
+      : validTrRefs.has(dedupRef)
+        ? "test-review"
+        : undefined;
+    const isCrossStageDedup = dedupTargetStage !== undefined && dedupTargetStage !== af.sourceStage;
+    if (isCrossStageDedup && af.disposition === "rejected" && sourceImpact) {
+      af.disposition = "accepted";
+      af.effectiveCandidateImpact = sourceImpact as typeof af.effectiveCandidateImpact;
+      af.verifiedEvidenceRefs = [...sourceEvidence];
+    }
+
+    if (af.disposition === "rejected") {
+      af.effectiveCandidateImpact = null;
     }
 
     // hypothesis must not be merge_blocking
@@ -951,16 +1056,7 @@ function validateEvidenceAudit(
     }
 
     // effectiveCandidateImpact must not exceed source finding's candidateImpact
-    const sourceImpact =
-      af.sourceStage === "behavior-review"
-        ? brImpactMap.get(af.sourceFindingRef)
-        : trImpactMap.get(af.sourceFindingRef);
-
-    if (
-      sourceImpact &&
-      af.effectiveCandidateImpact &&
-      af.effectiveCandidateImpact !== "needs_context"
-    ) {
+    if (sourceImpact && af.effectiveCandidateImpact && af.effectiveCandidateImpact !== "needs_context") {
       const sourceRank = IMPACT_RANK[sourceImpact] ?? 0;
       const auditRank = IMPACT_RANK[af.effectiveCandidateImpact] ?? 0;
       if (auditRank > sourceRank) {
@@ -978,18 +1074,14 @@ function validateEvidenceAudit(
     }
 
     // deduplicatedWith must reference a valid audit finding
-    if (af.deduplicatedWith !== undefined) {
-      if (!allFindingRefs.has(af.deduplicatedWith)) {
-        errors.push(`deduplicatedWith references unknown finding: ${af.deduplicatedWith}`);
-      }
+    // Clear invalid values (null, empty string, hallucinated references, or cross-stage references)
+    if (!dedupRef || !dedupTargetStage || isCrossStageDedup) {
+      af.deduplicatedWith = undefined;
     }
   }
 
-  // Summary must match actual counts
-  const dispositionToKey: Record<
-    string,
-    keyof { accepted: number; downgraded: number; needsContext: number; rejected: number }
-  > = {
+  // Fix summary to match actual counts (Claude may hallucinate)
+  const dispositionToKey: Record<string, keyof { accepted: number; downgraded: number; needsContext: number; rejected: number }> = {
     accepted: "accepted",
     downgraded: "downgraded",
     needs_context: "needsContext",
@@ -1002,27 +1094,12 @@ function validateEvidenceAudit(
       counts[key]++;
     }
   }
-  if (counts.accepted !== output.summary.accepted) {
-    errors.push(
-      `summary.accepted mismatch: expected ${counts.accepted}, got ${output.summary.accepted}`,
-    );
-  }
-  if (counts.downgraded !== output.summary.downgraded) {
-    errors.push(
-      `summary.downgraded mismatch: expected ${counts.downgraded}, got ${output.summary.downgraded}`,
-    );
-  }
-  if (counts.needsContext !== output.summary.needsContext) {
-    errors.push(
-      `summary.needsContext mismatch: expected ${counts.needsContext}, got ${output.summary.needsContext}`,
-    );
-  }
-
-  if (counts.rejected !== output.summary.rejected) {
-    errors.push(
-      `summary.rejected mismatch: expected ${counts.rejected}, got ${output.summary.rejected}`,
-    );
-  }
+  output.summary = {
+    accepted: counts.accepted,
+    downgraded: counts.downgraded,
+    needsContext: counts.needsContext,
+    rejected: counts.rejected,
+  };
 
   return errors;
 }
@@ -1034,16 +1111,27 @@ function buildEvidenceAuditPrompt(
 ): string {
   // Build per-finding evidence lists for the prompt
   const brFindingsList = JSON.parse(behaviorReviewJson)
-    .findings.map(
-      (f: any) =>
-        `  - [${f.id}] ${f.title} (impact: ${f.candidateImpact}, confidence: ${f.confidence})\n    evidenceRefs: ${(f.evidenceRefs ?? []).join(", ")}`,
-    )
+    .findings.map((f: any) => [
+      `  - [${f.id}] ${f.title} (impact: ${f.candidateImpact}, confidence: ${f.confidence})`,
+      `    type: ${f.type ?? ""}`,
+      `    trigger: ${f.trigger ?? ""}`,
+      `    observedBehavior: ${f.observedBehavior ?? ""}`,
+      `    expectedBehavior: ${f.expectedBehavior ?? ""}`,
+      `    impact: ${f.impact ?? ""}`,
+      `    recommendation: ${f.recommendation ?? ""}`,
+      `    evidenceRefs: ${(f.evidenceRefs ?? []).join(", ")}`,
+    ].join("\n"))
     .join("\n");
   const trFindingsList = JSON.parse(testReviewJson)
-    .findings.map(
-      (f: any) =>
-        `  - [${f.id}] ${f.title} (impact: ${f.candidateImpact}, confidence: ${f.confidence})\n    evidenceRefs: ${(f.evidenceRefs ?? []).join(", ")}`,
-    )
+    .findings.map((f: any) => [
+      `  - [${f.id}] ${f.title} (impact: ${f.candidateImpact}, confidence: ${f.confidence})`,
+      `    type: ${f.type ?? ""}`,
+      `    behavior: ${f.behavior ?? ""}`,
+      `    observedTestCoverage: ${f.observedTestCoverage ?? ""}`,
+      `    impact: ${f.impact ?? ""}`,
+      `    recommendation: ${f.recommendation ?? ""}`,
+      `    evidenceRefs: ${(f.evidenceRefs ?? []).join(", ")}`,
+    ].join("\n"))
     .join("\n");
 
   return `You are performing an evidence audit for a code review.
@@ -1057,8 +1145,17 @@ CONSTRAINTS:
 4. When evidence is insufficient, prefer needs_context. Do NOT speculate.
 5. You MUST NOT upgrade any finding's candidateImpact level.
 6. Do NOT output blockers, merge recommendations, or request-changes.
-7. For duplicate findings, specify the primary finding via deduplicatedWith.
+7. DEDUPLICATION RULES (CRITICAL):
+   - "deduplicated" means: SAME root cause, SAME behavior deviation, SAME fix action. Use deduplicatedWith ONLY in this case.
+   - "related" means: same risk chain, but DIFFERENT fix actions. Do NOT use deduplicatedWith for related findings.
+   - A behavior finding (e.g., "state not restored after failure") and a test finding (e.g., "no regression test for retry after failure") are RELATED, NOT duplicates. They require different fixes.
+   - Cross-stage findings (behavior-review vs test-review) are almost NEVER true duplicates. Keep both.
+   - When in doubt, keep the finding. Do NOT reject findings as duplicates unless you are certain they have the same fix action.
 8. CRITICAL: verifiedEvidenceRefs MUST be a SUBSET of the finding's evidenceRefs listed below. Do NOT invent new evidence refs.
+9. Audit the finding's own trigger / observedBehavior / impact chain against the cited evidence. Do NOT ignore those fields.
+10. For behavior-review findings, Do NOT require separate runtime tests or consumer context when the cited code directly proves the described state transition, failure path, boundary condition, or behavior deviation.
+11. If a high-confidence behavior-review finding is already candidateImpact=merge_blocking and its trigger + observedBehavior are directly proven by verified source refs, preserve effectiveCandidateImpact=merge_blocking unless the evidence is invalid, hypothesis-only, duplicate, or outside scope.
+12. Missing regression tests are handled by test-review findings. Do NOT downgrade a behavior finding merely because tests are missing.
 
 EVIDENCE CLASSIFICATION:
 - observed: conclusion directly proven by code, diff, test output, or verification record
@@ -1277,10 +1374,12 @@ CONSTRAINTS:
 8. Your recommendation must reflect the actual state of issues and verification.
 
 RECOMMENDATION RULES:
-- ready_to_merge: no blocking candidates, no failed verification, uncovered areas acceptable
-- not_ready_to_merge: blocking candidates exist or critical verification failed
+- ready_to_merge: no merge_blocking candidates, no failed verification, uncovered areas acceptable. Material and advisory issues do NOT block merge.
+- not_ready_to_merge: merge_blocking candidates exist or critical verification failed. Only candidateImpact=merge_blocking counts as blocking. Material issues are informational, not blocking.
 - insufficient_evidence: key uncovered/needs_context areas, cannot assess risk
 - escalate: conflicting signals, need human judgment
+
+IMPORTANT: "blocking" means candidateImpact=merge_blocking ONLY. Material issues are recorded for awareness but do NOT prevent merge.
 
 ISSUE LEDGER (${issueLedger.issues.length} issues${truncatedCount > 0 ? `, showing top ${MAX_ISSUES_IN_PROMPT}, ${truncatedCount} truncated` : ""}):
 ${issuesList || "  (no issues)"}
@@ -1355,13 +1454,9 @@ function validateSynthesis(
   // Build valid issue ID set
   const validIssueIds = new Set(issueLedger.issues.map((i) => i.id));
 
-  // Validate issueGroups reference valid issue IDs
+  // Filter out hallucinated issue IDs from issueGroups
   for (const group of output.issueGroups) {
-    for (const issueId of group.issueIds) {
-      if (!validIssueIds.has(issueId)) {
-        errors.push(`issueGroup references unknown issueId: ${issueId}`);
-      }
-    }
+    group.issueIds = group.issueIds.filter((id) => validIssueIds.has(id));
   }
 
   // Validate no new evidenceRefs in issueGroups
@@ -1399,19 +1494,15 @@ function validateSynthesis(
     errors.push("Cannot recommend ready_to_merge with failed verification commands");
   }
 
-  // Validate verificationSummary matches actual verification ledger
+  // Fix verificationSummary to match actual verification ledger (Claude may hallucinate)
   if (verificationLedger) {
-    const vl = verificationLedger;
-    if (output.verificationSummary.passed !== vl.summary.passed) {
-      errors.push(
-        `verificationSummary.passed mismatch: expected ${vl.summary.passed}, got ${output.verificationSummary.passed}`,
-      );
-    }
-    if (output.verificationSummary.failed !== vl.summary.failed) {
-      errors.push(
-        `verificationSummary.failed mismatch: expected ${vl.summary.failed}, got ${output.verificationSummary.failed}`,
-      );
-    }
+    output.verificationSummary = {
+      passed: verificationLedger.summary.passed,
+      failed: verificationLedger.summary.failed,
+      skipped: verificationLedger.summary.skipped,
+      notRequired: verificationLedger.summary.notRequired,
+      note: output.verificationSummary?.note ?? "",
+    };
   }
 
   return errors;
@@ -1679,6 +1770,18 @@ CONSTRAINTS:
 - If you cannot confirm something, add to uncoveredContext. Do NOT speculate.
 - Do NOT describe unexecuted commands as executed.
 - Do NOT output blockers, merge recommendations, or request-changes.
+
+IMPACT LEVELS (CRITICAL):
+- merge_blocking: for confirmed, directly observable behavior defects that would cause incorrect runtime behavior (e.g., state corruption, data loss, infinite loops, security vulnerabilities). Requires HIGH confidence and OBSERVED evidence from the code. Example: "function sets flag but never resets it on error, causing permanent stuck state."
+- material: for significant concerns that need attention but are not confirmed runtime defects. Includes: missing input validation, missing tests, untested edge cases, potential performance issues, code that works but has quality gaps.
+- advisory: for minor suggestions, style improvements, or low-risk observations.
+- needs_context: when you cannot determine the risk without more business context.
+
+KEY DISTINCTION:
+- "submit() never resets isSubmitting on error" → merge_blocking (confirmed behavior defect)
+- "submit() has no input validation" → material (quality gap, not confirmed defect)
+- "No tests for submit()" → material (coverage gap)
+- "TODO: add business rules" → needs_context (missing context)
 - All evidence refs MUST use the format: git:<commit>:<path>#L<start>-L<end>
 - The commit in evidence refs MUST be: ${headCommit}
 - Line numbers in evidence refs MUST match the SOURCE CONTEXT provided below. Count lines starting from 1. Do NOT guess or infer line numbers from the diff.

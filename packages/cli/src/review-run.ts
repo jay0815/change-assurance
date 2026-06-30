@@ -202,14 +202,17 @@ export async function reviewRun(options: RunOptions): Promise<ReviewRunResult> {
     }
 
     try {
+      console.log(`  [${stageName}] Starting...`);
       await reviewStage({ runId, stage: stageName as any, adapter: options.adapter });
       stageStep.status = "passed";
       stageStep.endedAt = now();
+      console.log(`  [${stageName}] Completed`);
     } catch (error) {
       stageStep.status = "failed";
       stageStep.endedAt = now();
       stageStep.message = error instanceof Error ? error.message : String(error);
       hasStageFailure = true;
+      console.log(`  [${stageName}] Failed: ${stageStep.message}`);
     }
   }
 

@@ -222,7 +222,7 @@ describe("reviewStage - synthesis", () => {
     };
   }
 
-  it("should only reference issueIds that exist in issue-ledger", async () => {
+  it("should filter out hallucinated issueIds from issueGroups", async () => {
     const { runId } = createSynthesisFixture({
       issues: [
         {
@@ -246,13 +246,18 @@ describe("reviewStage - synthesis", () => {
     const adapter = createFakeAdapter({
       recommendation: "ready_to_merge",
       recommendationRationale: "All clear",
-      issueGroups: [{ title: "Group", issueIds: ["nonexistent-id"], summary: "test" }],
+      issueGroups: [{ title: "Group", issueIds: ["issue-br-F001", "nonexistent-id"], summary: "test" }],
       verificationSummary: { passed: 0, failed: 0, skipped: 0, notRequired: 0, note: "" },
       uncoveredSummary: [],
       assumptions: [],
     });
 
-    await expect(reviewStage({ runId, stage: "synthesis", adapter })).rejects.toThrow(StageError);
+    const { stageArtifactPath } = await reviewStage({ runId, stage: "synthesis", adapter });
+    expect(stageArtifactPath).toContain("synthesis.json");
+
+    // Verify the hallucinated issueId was filtered out
+    const artifact = JSON.parse(readFileSync(stageArtifactPath, "utf-8"));
+    expect(artifact.issueGroups[0].issueIds).toEqual(["issue-br-F001"]);
   });
 
   it("should fail when synthesis adds new evidenceRef not in issue-ledger", async () => {

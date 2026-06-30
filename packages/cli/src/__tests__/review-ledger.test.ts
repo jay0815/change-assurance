@@ -220,7 +220,11 @@ describe("generateLedgers", () => {
   }
 
   it("should archive accepted finding as issue", () => {
-    const { runId } = createLedgerFixture();
+    const { runId } = createLedgerFixture({
+      evidenceAuditFindings: [
+        { sourceFindingRef: "B001", sourceStage: "behavior-review", disposition: "accepted", evidenceClass: "observed", effectiveCandidateImpact: "material", rationale: "verified", verifiedEvidenceRefs: ["ref1"], missingEvidence: [], missingContext: [] },
+      ],
+    });
     const cwd = process.cwd();
     process.chdir(tempDir);
     try {
@@ -291,17 +295,19 @@ describe("generateLedgers", () => {
     }
   });
 
-  it("should deduplicate findings and only keep primary issue", () => {
+  it("should deduplicate findings within same stage but keep cross-stage findings", () => {
     const { runId } = createLedgerFixture();
     const cwd = process.cwd();
     process.chdir(tempDir);
     try {
       const result = generateLedgers({ runId });
       const issueLedger = JSON.parse(readFileSync(result.issueLedgerPath, "utf-8"));
-      // T001 is deduplicated with B001, so only B001 becomes an issue
-      expect(issueLedger.issues).toHaveLength(1);
+      // T001 (test-review) deduplicatedWith B001 (behavior-review) is cross-stage,
+      // so both are kept as separate issues
+      expect(issueLedger.issues).toHaveLength(2);
       expect(issueLedger.issues[0].sourceFindingRef).toBe("B001");
-      expect(issueLedger.summary.deduplicated).toBe(1);
+      expect(issueLedger.issues[1].sourceFindingRef).toBe("T001");
+      expect(issueLedger.summary.deduplicated).toBe(0);
     } finally {
       process.chdir(cwd);
     }

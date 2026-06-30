@@ -226,7 +226,7 @@ Claude 负责判断：
 ```text
 - issue 是否有足够证据
 - 是否把假设误写成事实
-- 是否存在重复 issue
+- 是否存在重复 issue（仅限同 stage 内）
 - 是否需要降级为 needs_context
 ```
 
@@ -236,6 +236,17 @@ Harness 负责校验：
 - evidenceRef 是否存在
 - blocker 是否有 location / trigger / impact
 - passed command 是否存在于 verification ledger
+- 跨 stage 去重自动恢复为 accepted
+- summary 计数从实际数据重新计算
+```
+
+去重规则：
+
+```text
+- "deduplicated": 同一根因、同一行为偏差、同一修复动作
+- "related": 同一风险链，但修复动作不同
+- 跨 stage 的 finding 几乎不应被去重
+- Behavior finding 和 Test finding 是 related，不是 duplicate
 ```
 
 ---
@@ -350,9 +361,42 @@ type CoverageItem = {
 
 ---
 
-## 7. Blocker 校验规则
+## 7. Impact 级别规则
 
-只有同时满足以下条件，Issue 才能保持为 `blocking`：
+### 7.1 Impact 级别定义
+
+```text
+merge_blocking: 确认的行为缺陷，会导致运行时错误行为
+  例：状态永久卡死、数据丢失、安全漏洞、无限循环
+  要求：高置信度 + observed 证据
+
+material: 需要关注但不是确认的生产缺陷
+  例：缺少输入验证、缺少测试、未测试的边界条件
+
+advisory: 低风险建议
+  例：代码风格、文档改进
+
+needs_context: 无法确定风险，需要更多上下文
+  例：业务规则未定义、模块依赖关系不明
+```
+
+### 7.2 阶段级 Impact 限制
+
+```text
+Behavior Review:
+  可提出 merge_blocking / material / advisory / needs_context
+
+Test Review:
+  只能提出 material / advisory / needs_context
+  不允许 merge_blocking
+
+理由：弱测试、缺失测试本身不是已证实的线上行为缺陷。
+它可以阻止"证据充分性"，但不应被模型直接包装成产品 blocker。
+```
+
+### 7.3 Blocker 校验规则
+
+只有同时满足以下条件，Issue 才能保持为 `merge_blocking`：
 
 ```text
 - 有明确 location
@@ -361,6 +405,7 @@ type CoverageItem = {
 - 有至少一个有效 evidenceRef
 - evidenceRef 指向本次 run 内真实 artifact
 - confidence 不是 low
+- 是确认的行为缺陷，不是假设的风险
 ```
 
 否则 Harness 必须：
@@ -370,9 +415,54 @@ type CoverageItem = {
 或拒绝生成该 blocker
 ```
 
+### 7.4 特殊降级规则
+
+以下情况自动降级 merge_blocking 到 material：
+
+```text
+- evidenceRefs 只指向测试文件（.test.*、.spec.*）
+- evidenceRefs 指向 change-assurance.yaml（验证配置问题）
+- finding 关于 verification/verify/check（由 verification ledger 处理）
+- evidenceClass 为 hypothesis
+```
+
 ---
 
-## 8. Claude Code 接入
+## 8. 去重规则
+
+### 8.1 去重定义
+
+```text
+deduplicated: 同一根因、同一行为偏差、同一修复动作
+related: 同一风险链，但修复动作不同
+```
+
+### 8.2 跨阶段去重限制
+
+```text
+Behavior Review 和 Test Review 的 finding 几乎不应被去重。
+
+例：
+  Behavior finding: "失败后状态未恢复"
+  Test finding: "没有覆盖失败后可重试的回归测试"
+
+  → 这是 related，不是 duplicate
+  → 两个 finding 都应保留
+  → 可在 synthesis 中分到同一风险组
+```
+
+### 8.3 去重校验
+
+```text
+- 同一 stage 内的去重：允许
+- 跨 stage 的去重：禁止，自动恢复为 accepted
+- 被 rejected 的 finding 不进入 issue-ledger
+- 被 deduplicated 的 finding 不进入 issue-ledger（仅限同 stage）
+```
+
+---
+
+## 9. Claude Code 接入
 
 仓库内提供：
 
@@ -409,7 +499,7 @@ ca review run --base origin/main --head HEAD --engine claude --dry-run
 
 ---
 
-## 9. MVP 非目标
+## 10. MVP 非目标
 
 MVP 不实现：
 
@@ -425,7 +515,7 @@ MVP 不实现：
 
 ---
 
-## 10. 设计原则总结
+## 11. 设计原则总结
 
 ```text
 Agent 提出候选结论；

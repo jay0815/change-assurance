@@ -153,11 +153,17 @@ function buildIssueLedger(
   const brFindings = new Map(br.findings.map((f) => [f.id, f]));
   const trFindings = new Map(tr.findings.map((f) => [f.id, f]));
 
-  // Track deduplicated finding IDs
+  // Track deduplicated finding IDs (only within same stage)
   const deduplicatedRefs = new Set<string>();
   for (const af of audit.auditedFindings) {
     if (af.deduplicatedWith) {
-      deduplicatedRefs.add(af.sourceFindingRef);
+      // Only deduplicate if the target finding is in the same stage
+      const targetInSameStage = audit.auditedFindings.some(
+        (other) => other.sourceFindingRef === af.deduplicatedWith && other.sourceStage === af.sourceStage,
+      );
+      if (targetInSameStage) {
+        deduplicatedRefs.add(af.sourceFindingRef);
+      }
     }
   }
 

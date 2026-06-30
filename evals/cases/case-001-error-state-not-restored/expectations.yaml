@@ -7,7 +7,7 @@ expected:
   mustFind:
     - id: failure-state-not-restored
       sourceStage: behavior-review
-      minImpact: material
+      minImpact: merge_blocking
       evidencePaths:
         - src/submit.js
       anyTextPatterns:
