@@ -10,6 +10,7 @@
     "lint:fix": "oxlint --fix",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
+    "eval:web": "pnpm --filter @change-assurance/eval-web start",
     "ca": "node packages/cli/dist/index.js"
   },
   "devDependencies": {

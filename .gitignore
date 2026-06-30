@@ -2,6 +2,7 @@ node_modules/
 dist/
 *.tsbuildinfo
 .change-assurance/
+.harness-eval/
 .DS_Store
 *.log
 evals/workspaces/

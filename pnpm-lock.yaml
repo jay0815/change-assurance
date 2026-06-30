@@ -47,6 +47,8 @@ importers:
 
   packages/core: {}
 
+  packages/eval-web: {}
+
   packages/skills: {}
 
 packages:

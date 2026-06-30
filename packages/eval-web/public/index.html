@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Eval Console</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>Eval Console</h1>
+          <p id="runMeta">No run loaded</p>
+        </div>
+        <form id="loadForm" class="load-form">
+          <label>
+            <span>Config</span>
+            <input
+              id="configPath"
+              name="configPath"
+              value="packages/core/examples/eval-change-assurance-casting.json"
+              autocomplete="off"
+            />
+          </label>
+          <label>
+            <span>Output Dir</span>
+            <input
+              id="outputDir"
+              name="outputDir"
+              value=".harness-eval/change-assurance-casting-dry-run"
+              autocomplete="off"
+            />
+          </label>
+          <button type="submit">Load</button>
+        </form>
+      </header>
+
+      <section class="metric-strip" aria-label="Run summary">
+        <div><span>Total</span><strong id="metricTotal">0</strong></div>
+        <div><span>Pasted</span><strong id="metricPasted">0</strong></div>
+        <div><span>Valid</span><strong id="metricValid">0</strong></div>
+        <div><span>Invalid</span><strong id="metricInvalid">0</strong></div>
+        <div><span>Pass</span><strong id="metricPass">0</strong></div>
+        <div><span>Fail</span><strong id="metricFail">0</strong></div>
+      </section>
+
+      <section class="artifact-bar" aria-label="Artifact status">
+        <span id="artifactMatrix">matrix</span>
+        <span id="artifactSummary">summary</span>
+        <span id="artifactResults">results</span>
+        <span id="artifactCommands">commands</span>
+        <span id="artifactPromptfoo">promptfoo</span>
+      </section>
+
+      <section class="workspace">
+        <section class="matrix-panel" aria-label="Evaluation matrix">
+          <div class="table-toolbar">
+            <label>
+              <span>Model</span>
+              <select id="modelFilter">
+                <option value="">All</option>
+              </select>
+            </label>
+            <label>
+              <span>Status</span>
+              <select id="statusFilter">
+                <option value="">All</option>
+                <option value="not-run">not-run</option>
+                <option value="pasted">pasted</option>
+                <option value="valid">valid</option>
+                <option value="invalid">invalid</option>
+                <option value="parse_error">parse_error</option>
+              </select>
+            </label>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Case</th>
+                  <th>Role</th>
+                  <th>Prompt</th>
+                  <th>Model</th>
+                  <th>Attempt</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="matrixBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <aside id="detailPanel" class="detail-panel empty" aria-label="Cell detail">
+          <div class="detail-heading">
+            <div>
+              <h2 id="cellTitle">No Cell</h2>
+              <p id="cellSubtitle">Load a run</p>
+            </div>
+            <span id="cellStatus" class="status-pill">not-run</span>
+          </div>
+
+          <section id="emptyView" class="empty-detail">
+            <strong>No cell selected</strong>
+            <span
+              >Load a dry-run output directory, then select a matrix row to inspect the prompt and
+              paste model output.</span
+            >
+          </section>
+
+          <div class="tabs" role="tablist">
+            <button id="tabPrompt" class="tab active" type="button">Prompt</button>
+            <button id="tabOutput" class="tab" type="button">Output</button>
+          </div>
+
+          <section id="promptView" class="tab-view active">
+            <div class="prompt-meta">
+              <span id="promptStatus">missing</span>
+              <button id="copyPrompt" class="secondary" type="button">Copy</button>
+            </div>
+            <pre id="promptText"></pre>
+          </section>
+
+          <section id="outputView" class="tab-view">
+            <textarea id="outputText" spellcheck="false"></textarea>
+            <div class="output-actions">
+              <button id="validateOutput" type="button">Validate</button>
+              <span id="validationMessage">not-run</span>
+            </div>
+          </section>
+        </aside>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
