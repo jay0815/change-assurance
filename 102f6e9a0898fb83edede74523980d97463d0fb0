@@ -1,0 +1,28 @@
+.gitignore
+  fd2b9761fd12b38e 5
+tsconfig.json
+  fd2b9761fd12b38e 6-7
+package.json
+  fd2b9761fd12b38e 13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "102f6e9a0898fb83edede74523980d97463d0fb0",
+  "prompts": {
+    "fd2b9761fd12b38e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f1318-2bda-7c53-ac76-b67a2febf7bc",
+        "model": "gpt-5.5"
+      },
+      "human_author": "guanchengqian",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 1,
+      "accepted_lines": 4,
+      "overriden_lines": 0,
+      "messages_url": "http://10.1.138.136:9188/cas/c7a8605a813b536445dd260a72aa3e6da88adb5683960c8b09f47ef7406893d7"
+    }
+  }
+}
